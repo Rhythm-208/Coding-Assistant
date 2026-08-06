@@ -1,5 +1,5 @@
-from ..State import AgentState
-from ..tools import read_file_numbered , list_folder_content
+from State import AgentState
+from tools import read_file_numbered , list_folder_content
 from langchain_deepseek import ChatDeepSeek
 from langchain.agents import create_agent
 from dotenv import load_dotenv
@@ -47,7 +47,7 @@ as a unified diff, nothing else.  """
     }
     response = agent.invoke(inputs)
 
-    return {"propose_change": response["messages"][-1].content}
+    return {"Propose_change": response["messages"][-1].content}
 
 
 

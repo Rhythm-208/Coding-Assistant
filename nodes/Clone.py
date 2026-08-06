@@ -15,7 +15,6 @@ def clone_repo(state:AgentState):
     existing folder - always creates its own, so there's no risk of
     cloning into something that already has unrelated files in it.
     """
-    repo_url =state["repo_url"]
     dest_dir = tempfile.mkdtemp(prefix="agent_clone_")
 
     try:

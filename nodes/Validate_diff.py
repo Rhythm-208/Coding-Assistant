@@ -1,4 +1,4 @@
-from ..State import AgentState , ValidationResult
+from State import AgentState , ValidationResult
 from dataclasses import dataclass
 from unidiff import PatchSet
 from unidiff.errors import UnidiffParseError
@@ -54,7 +54,7 @@ def validate_diff(state: AgentState):
         patch_set = PatchSet(cleaned)
 
     except UnidiffParseError as e:
-        return {'validation_resuly':ValidationResult(valid=False, reason=f"Diff did not parse: {e}")}
+        return {'validation_result':ValidationResult(valid=False, reason=f"Diff did not parse: {e}")}
 
     touched_files = [pf.path for pf in patch_set]
 

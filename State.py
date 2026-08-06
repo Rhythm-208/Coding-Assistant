@@ -4,6 +4,7 @@ from langgraph.graph.message import add_messages
 from dataclasses import dataclass, field
 
 
+
 @dataclass
 class CloneResult:
     success: bool
@@ -16,6 +17,10 @@ class ValidationResult:
     reason: str = ""              # why it failed, if it did
     cleaned_diff: str = ""         # diff text with markdown fences stripped, ready to apply
     touched_files: list[str] = field(default_factory=list)
+
+@dataclass
+class Test:
+    exitcode: int
 
 @dataclass
 class ApplyResult:

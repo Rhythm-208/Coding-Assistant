@@ -1,14 +1,15 @@
 import subprocess
-from ..State import AgentState , ApplyResult
+from State import AgentState , ApplyResult
 from dataclasses import dataclass
 from pathlib import Path
 
+# add guard rrail to check if the diff is validated
 
 
 
 def apply_diff(state:AgentState):
     repo  =  Path(state['repo_path'])
-    diff_text = state['validation_result']['cleaned_diff']
+    diff_text = state['validation_result'].cleaned_diff
 
     if not repo.is_dir():
         raise FileNotFoundError(f"repo_path does not exist: {state['repo_path']}")
