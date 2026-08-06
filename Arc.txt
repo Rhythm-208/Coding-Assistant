@@ -1,8 +1,0 @@
-1) Diagnose ->
-first give it the issue title and description and then call the files the model recommends
-give the issue and files to a model and develop a diagnose
-
-2)From the diagnose make changes to test ->
-from the mo
-
-3) test the changes if they sucessed go to human to ask if you want to apply else go to step 2 with past failure
