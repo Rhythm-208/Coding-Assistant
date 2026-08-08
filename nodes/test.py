@@ -2,18 +2,12 @@ import io
 import os
 import tarfile
 import time
-import uuid
-from typing import Annotated, TypedDict , Optional
 
+from State import AgentState,TestResult
 import docker
 from docker.errors import NotFound
 
-from langchain_core.tools import tool
-from langchain_core.messages import AnyMessage, ToolMessage
-from langgraph.graph import StateGraph, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
-from win32inetcon import MAX_GOPHER_ATTRIBUTE_NAME
+
 
 DOCKER_IMAGE = "python:3.11-slim"
 CONTAINER_TIMEOUT_SECONDS = 15
@@ -57,7 +51,6 @@ def _write_file_to_container(container,path:str,content:str)->None:
 
     with tarfile.open(fileobj=tarstream, mode="w") as tar:
         info = tarfile.TarInfo(name=path.lstrip("/"))
-        #Underdtand Tar file and its function
         info.size = len(data)
         tar.addfile(tarinfo=info, fileobj=io.BytesIO(data))
 
@@ -73,27 +66,23 @@ def run_in_sandbox(thread_id:str,file_path:str)->dict:
     container_id = _get_or_create_container(thread_id)
     container = _client.containers.get(container_id)
 
-    container_path = f"tmp/{os.path.basename(file_path)}"
+    container_path = os.path.basename(file_path)
     _write_file_to_container(container,container_path,code)
 
     start = time.time()
 
     try:
         exit_code, output = container.exec_run(
-            cmd=["python3", f"/{container_path}"],
+            cmd=["timeout", str(CONTAINER_TIMEOUT_SECONDS), "python3", f"/tmp/{container_path}"],
             demux=True,  # separate stdout/stderr
             user="nobody",
         )
         stdout, stderr = output
-        timed_out = False
+        timed_out = (exit_code ==124)
     except Exception as e:
         exit_code, stdout, stderr, timed_out = 1, b"", str(e).encode(), False
 
     elapsed = time.time() - start
-    if elapsed > CONTAINER_TIMEOUT_SECONDS:
-        timed_out = True  # exec_run has no native timeout; enforce your own
-        # In production: run exec_run in a thread and kill it past the limit,
-        # or use container.exec_run with a wrapper like `timeout 15 python3 ...`
 
     return {
         "exit_code": exit_code,
@@ -111,8 +100,22 @@ def cleanup_container(thread_id: str) -> None:
         except NotFound:
             pass
 
+#Creating Node->
 
+def test_node(state: AgentState) -> dict:
+    result = run_in_sandbox(state["thread_id"], state["file_path"])
+    passed = result["exit_code"] == 0 and not result["timed_out"]
 
+    if passed:
+        test_result = TestResult(passed=True, outcome="passed")
+    else:
+        outcome = "timeout" if result["timed_out"] else "failed"
+        test_result = TestResult(passed=False, outcome=outcome, failure_text=result["stderr"])
+
+    return {
+        "test_result": test_result,
+        "iteration": state.get("iteration", 0) + 1,
+    }
 
 
 

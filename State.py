@@ -19,8 +19,11 @@ class ValidationResult:
     touched_files: list[str] = field(default_factory=list)
 
 @dataclass
-class Test:
-    exitcode: int
+class TestResult:
+    passed:bool
+    outcome: str = "" # "passed" | "failed" | "timeout"
+    failure_text: str = ""
+
 
 @dataclass
 class ApplyResult:
@@ -46,6 +49,13 @@ class AgentState(TypedDict):
     validation_result: Optional[ValidationResult]
 
     apply_diff : Optional[ApplyResult]
+
+    thread_id: Optional[str]
+    file_path: Optional[str]
+    test_result: Optional[TestResult]
+
+    iteration: int
+    max_iterations: int
 
 
     Prev_Failed_Diagnose : Annotated[List[BaseMessage],add_messages]
