@@ -54,6 +54,8 @@ class AgentState(TypedDict):
     file_path: Optional[str]
     test_result: Optional[TestResult]
 
+    status: Optional[str]  # "done" | "rejected" | "escalated" | "failed"
+
     iteration: int
     max_iterations: int
 
