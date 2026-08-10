@@ -1,13 +1,14 @@
 import subprocess
 import tempfile
-from dataclasses import dataclass
-from ..State import AgentState,CloneResult
+import uuid
+from State import AgentState, CloneResult
+
 
 #Point to keep to check:
 def route_after_clone(state: AgentState) -> str:
     if not state["clone_result"].success:
         return "escalate"       # or "failed", whatever you name your end/error node
-    return "diagnose"
+    return "Diagnose"
 
 def clone_repo(state:AgentState):
     """
@@ -26,7 +27,21 @@ def clone_repo(state:AgentState):
             text=True,
             timeout=120,  # don't hang forever on a bad/huge repo
         )
-        return {'clone_result':CloneResult(success=True, repo_path=dest_dir),'repo_path':dest_dir}
+
+        # Bug 6: generate a unique thread_id for Docker sandbox tracking
+        thread_id = str(uuid.uuid4())
+
+        # Bug 6: discover test files in the repo for the test node
+        from pathlib import Path
+        test_files = list(Path(dest_dir).rglob("test_*.py")) + list(Path(dest_dir).rglob("*_test.py"))
+        file_path = str(test_files[0]) if test_files else ""
+
+        return {
+            'clone_result': CloneResult(success=True, repo_path=dest_dir),
+            'repo_path': dest_dir,
+            'thread_id': thread_id,
+            'file_path': file_path,
+        }
 
     except subprocess.CalledProcessError as e:
         return {'clone_result' :CloneResult(

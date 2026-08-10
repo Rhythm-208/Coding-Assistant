@@ -1,10 +1,5 @@
 from State import AgentState
-from tools import read_file_numbered , list_folder_content
-from langchain_deepseek import ChatDeepSeek
-from langchain.agents import create_agent
-from dotenv import load_dotenv
-from langchain_core.prompts import ChatPromptTemplate
-load_dotenv()
+from llm import propose_rewrite_agent as agent
 
 SYSTEM_PROMPT = """You are a senior engineer writing a code fix.
 
@@ -22,33 +17,25 @@ Rules:
 - If prior attempts are shown and they failed, do not repeat the same change.
 """
 
+
 def propose_patch(state: AgentState):
 
-    tools = [read_file_numbered,list_folder_content]
-    llm = ChatDeepSeek(model="deepseek-chat")
-
-    agent = create_agent(llm, tools=tools)
-
-    user_prompt = f"""You are a senior software engineer You will be given a hypothesis about a bug and the current content of
-                  the relevant file
+    user_prompt = f"""You are a senior software engineer. You will be given a hypothesis about a bug and the current content of
+                  the relevant file.
                   Write a unified diff that fixes this.
                   TITLE: {state.get('issue_title')}
                   DESCRIPTION: {state.get('issue_description')}
                   DIAGNOSIS: {state.get('Diagnose')}
                   repo_path: {state.get('repo_path')}
-                  use the tools given to you and propose change in unified diff only no explanation,
+                  Use the tools given to you and propose a change in unified diff only — no explanation,
 preamble, or markdown code fences. Your entire response must be parseable
-as a unified diff, nothing else.  """
+as a unified diff, nothing else."""
 
     inputs = {
-        "messages": [("system" , SYSTEM_PROMPT),
-                     ("user",user_prompt),
+        "messages": [("system", SYSTEM_PROMPT),
+                     ("user", user_prompt),
                      ]
     }
     response = agent.invoke(inputs)
 
     return {"Propose_change": response["messages"][-1].content}
-
-
-
-

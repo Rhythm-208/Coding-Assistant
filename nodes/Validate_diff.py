@@ -67,6 +67,15 @@ def validate_diff(state: AgentState):
     return {'validation_result': ValidationResult(valid=True, cleaned_diff=cleaned, touched_files=touched_files)}
 
 
+def route_after_validation(state: AgentState) -> str:
+    """Guard rail: only proceed to apply_diff if the diff is valid."""
+    vr = state.get("validation_result")
+    if vr and vr.valid:
+        return "apply_diff"
 
+    # Invalid diff — retry or escalate
+    if state.get("iteration", 0) >= state.get("max_iterations", 5):
+        return "escalate"
+    return "Diagnose"
 
 

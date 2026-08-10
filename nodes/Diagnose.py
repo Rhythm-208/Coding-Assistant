@@ -1,32 +1,39 @@
 from State import AgentState
-from tools import read_file_numbered,list_folder_content
-from langchain_deepseek import ChatDeepSeek
-from langchain.agents import create_agent
-from dotenv import load_dotenv
-load_dotenv()
-tools = [read_file_numbered,list_folder_content]
+from llm import diagnose_agent as agent
 
-llm = ChatDeepSeek(model="deepseek-chat")
 
-agent = create_agent(llm,tools=tools)
+def Diagnose(state: AgentState) -> AgentState:
+    # Build context about previous failed attempts if any
+    prev_failures = state.get("Prev_Failed_Diagnose", [])
+    failure_context = ""
+    if prev_failures:
+        failure_context = "\n\nPREVIOUS FAILED ATTEMPTS (do NOT repeat these):\n"
+        for msg in prev_failures:
+            content = msg.content if hasattr(msg, "content") else str(msg)
+            failure_context += f"- {content}\n"
 
-def Diagnose(state:AgentState) -> AgentState:
-    prompt = f"""You are a senior software developer is there is the following issue you have 
+    prompt = f"""You are a senior software developer. There is the following issue:
                  issue_title: {state["issue_title"]},
                  issue_description: {state["issue_description"]},
-                 from the issue recommend the files and folder that need to be changed 
-                 and then read these files and give the diagnose on the sitation like what needs to be changed and what do you recommend
-                 we do not need you to change the code only diagnosis tell us what is wrong and in what files"""
+                 repo_path: {state.get("repo_path", "")}
+                 
+                 From the issue, use the tools to explore the repo structure and read 
+                 the relevant files. Then give a diagnosis: what is wrong, in which files,
+                 and what needs to be changed. 
+                 
+                 We do NOT need you to change the code — only diagnose and tell us 
+                 what is wrong and in what files.{failure_context}"""
     inputs = {
         "messages": [
             ("user", prompt)
         ]
     }
 
-    # FIX 2: Invoke the agent with the state dictionary
     response = agent.invoke(inputs)
 
-    # FIX 3: Extract the final answer from the last message in the returned state
     final_answer = response["messages"][-1].content
 
-    return {"Diagnose": final_answer}
+    return {
+        "Diagnose": final_answer,
+        "Prev_Failed_Diagnose": [("assistant", f"Failed diagnosis attempt: {final_answer}")],
+    }

@@ -1,0 +1,76 @@
+from langgraph.graph import StateGraph, START, END
+
+from State import AgentState
+from nodes.Clone import clone_repo, route_after_clone
+from nodes.Diagnose import Diagnose
+from nodes.Propose_rewrite import propose_patch
+from nodes.Validate_diff import validate_diff, route_after_validation
+from nodes.Apply_diff import apply_diff
+from nodes.test import test_node
+from nodes.HITL import human_approval
+from nodes.Routing import route_after_test, route_after_approval, escalate
+from nodes.commit import git_commit
+
+
+graph = StateGraph(AgentState)
+
+# --- register every node ---
+graph.add_node("clone_repo", clone_repo)
+graph.add_node("Diagnose", Diagnose)
+graph.add_node("propose_patch", propose_patch)
+graph.add_node("validate_diff", validate_diff)
+graph.add_node("apply_diff", apply_diff)
+graph.add_node("test_node", test_node)
+graph.add_node("human_approval", human_approval)
+graph.add_node("git_commit", git_commit)
+graph.add_node("escalate", escalate)
+
+# --- straight-line edges (no branching) ---
+graph.add_edge(START, "clone_repo")
+graph.add_edge("Diagnose", "propose_patch")
+graph.add_edge("propose_patch", "validate_diff")
+# validate_diff now has a conditional edge (Bug 5 fix)
+graph.add_edge("apply_diff", "test_node")
+graph.add_edge("git_commit", END)
+graph.add_edge("escalate", END)
+
+# --- branching edges ---
+graph.add_conditional_edges(
+    "clone_repo",
+    route_after_clone,
+    {"Diagnose": "Diagnose", "escalate": "escalate"},
+)
+
+# Bug 5 fix: guard rail — only apply if validation passed
+graph.add_conditional_edges(
+    "validate_diff",
+    route_after_validation,
+    {"apply_diff": "apply_diff", "Diagnose": "Diagnose", "escalate": "escalate"},
+)
+
+graph.add_conditional_edges(
+    "test_node",
+    route_after_test,
+    {"human_approval": "human_approval", "escalate": "escalate", "Diagnose": "Diagnose"},
+)
+
+graph.add_conditional_edges(
+    "human_approval",
+    route_after_approval,
+    {"git_commit": "git_commit", "end": END},
+)
+
+app = graph.compile()
+
+
+if __name__ == "__main__":
+    result = app.invoke({
+        "issue_title": "Check-dicosunt not working",
+        "issue_description": "The function isnt working properly",
+        "repo_url": "https://github.com/Rhythm-208/Testing.git",
+        "iteration": 0,
+        "max_iterations": 5,
+    })
+    print(result.get("status"))
+    for msg in result.get("messages", []):
+        print(msg)

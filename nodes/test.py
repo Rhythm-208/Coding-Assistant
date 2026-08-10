@@ -13,8 +13,16 @@ DOCKER_IMAGE = "python:3.11-slim"
 CONTAINER_TIMEOUT_SECONDS = 15
 MAX_ATTEMPTS = 3
 
-_client = docker.from_env()
-_containers :dict[str, str] = {}
+_client = None
+_containers: dict[str, str] = {}
+
+
+def _get_client():
+    """Lazily connect to Docker so import doesn't fail when Docker isn't running."""
+    global _client
+    if _client is None:
+        _client = docker.from_env()
+    return _client
 
 
 def _get_or_create_container(thread_id:str):
@@ -22,7 +30,7 @@ def _get_or_create_container(thread_id:str):
     #Maybe we can remove thread_id check for it
     if container_id:
         try:
-            c = _client.containers.get(container_id)
+            c = _get_client().containers.get(container_id)
             if c.status != "running":
                 c.start()
             return container_id
@@ -30,7 +38,7 @@ def _get_or_create_container(thread_id:str):
         except NotFound:
             pass
 
-    container = _client.containers.run(
+    container = _get_client().containers.run(
         DOCKER_IMAGE,
         command = "sleep infinity",
         detach = True,
@@ -64,7 +72,7 @@ def run_in_sandbox(thread_id:str,file_path:str)->dict:
         code =f.read()
 
     container_id = _get_or_create_container(thread_id)
-    container = _client.containers.get(container_id)
+    container = _get_client().containers.get(container_id)
 
     container_path = os.path.basename(file_path)
     _write_file_to_container(container,container_path,code)
@@ -96,7 +104,7 @@ def cleanup_container(thread_id: str) -> None:
     container_id = _containers.pop(thread_id, None)
     if container_id:
         try:
-            _client.containers.get(container_id).remove(force=True)
+            _get_client().containers.get(container_id).remove(force=True)
         except NotFound:
             pass
 

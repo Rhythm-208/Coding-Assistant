@@ -3,20 +3,11 @@ from State import AgentState
 from nodes.test import cleanup_container
 
 
-def _commit_changes(repo_path: str, issue_title: str) -> None:
-    subprocess.run(["git", "add", "-A"], cwd=repo_path, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "commit", "-m", f"Fix: {issue_title}"],
-        cwd=repo_path, check=True, capture_output=True,
-    )
-
-
 def _revert_changes(repo_path: str) -> None:
     subprocess.run(["git", "checkout", "--", "."], cwd=repo_path, capture_output=True)
 
 
 def human_approval(state: AgentState) -> dict:
-    repo_path = state["repo_path"]
     diff_text = state["validation_result"].cleaned_diff
 
     print("\n" + "=" * 60)
@@ -30,14 +21,14 @@ def human_approval(state: AgentState) -> dict:
 
     thread_id = state.get("thread_id")
     if thread_id:
-        cleanup_container(thread_id)  # sandbox's job is done either way
+        cleanup_container(thread_id)  # sandbox's job is done either way, win or lose
 
     if decision == "y":
-        try:
-            _commit_changes(repo_path, state.get("issue_title", "automated fix"))
-            return {"status": "done", "messages": [("assistant", "Change approved and committed.")]}
-        except subprocess.CalledProcessError as e:
-            return {"status": "failed", "messages": [("assistant", f"Commit failed: {e.stderr}")]}
+        return {"approved": True, "messages": [("assistant", "Approved - committing now.")]}
 
-    _revert_changes(repo_path)
-    return {"status": "rejected", "messages": [("assistant", "Change rejected by human, reverted.")]}
+    _revert_changes(state["repo_path"])
+    return {
+        "approved": False,
+        "status": "rejected",
+        "messages": [("assistant", "Change rejected by human, reverted.")],
+    }

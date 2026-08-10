@@ -31,19 +31,14 @@ class ApplyResult:
     error_message: str = ""
 
 class AgentState(TypedDict):
-    issue_title: str
-    issue_description: str
+    # --- Shared fields (both workflows) ---
     repo_url: str
     repo_path: str
-
-
-
 
     messages: Annotated[List[BaseMessage],add_messages]
 
     clone_result: CloneResult
 
-    Diagnose: Optional[str]
     Propose_change: Optional[str]
 
     validation_result: Optional[ValidationResult]
@@ -54,12 +49,20 @@ class AgentState(TypedDict):
     file_path: Optional[str]
     test_result: Optional[TestResult]
 
+    approved: Optional[bool]
+
     status: Optional[str]  # "done" | "rejected" | "escalated" | "failed"
 
     iteration: int
     max_iterations: int
 
-
     Prev_Failed_Diagnose : Annotated[List[BaseMessage],add_messages]
 
+    # --- Fixing_issue workflow fields ---
+    issue_title: Optional[str]
+    issue_description: Optional[str]
+    Diagnose: Optional[str]
 
+    # --- Changes workflow fields ---
+    prompt: Optional[str]           # user's natural-language change request
+    Analysis: Optional[str]         # analyze node's understanding of what to change

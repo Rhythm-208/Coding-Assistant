@@ -1,4 +1,4 @@
-from ..State import AgentState
+from State import AgentState
 import subprocess
 from nodes.test import cleanup_container
 
@@ -12,6 +12,19 @@ def route_after_test(state: AgentState) -> str:
         return "escalate"
 
     return "Diagnose"
+
+
+def route_after_approval(state: AgentState) -> str:
+    """
+    Runs after human_approval. That node already did the real work for
+    the rejection path (reverted the working tree, set status="rejected"),
+    so this function only needs to decide where to route next:
+      - approved -> git_commit actually performs the commit
+      - rejected -> nothing left to do, go straight to END
+    """
+    if state.get("approved"):
+        return "git_commit"
+    return "end"
 
 
 def escalate(state: AgentState) -> dict:
