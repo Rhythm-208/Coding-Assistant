@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, START, END
+# LangSmith tracing is enabled via environment variables
 
 from State import AgentState
 from nodes.Clone import clone_repo, route_after_clone
@@ -64,13 +65,25 @@ app = graph.compile()
 
 
 if __name__ == "__main__":
-    result = app.invoke({
-        "issue_title": "Check-dicosunt not working",
-        "issue_description": "The function isnt working properly",
-        "repo_url": "https://github.com/Rhythm-208/Testing.git",
-        "iteration": 0,
-        "max_iterations": 5,
-    })
+    import os
+    from dotenv import load_dotenv
+    # Load environment variables from .env (project root)
+    load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".env")))
+    # Ensure LangSmith API key is available under both variable names
+    if not os.getenv("LANGCHAIN_API_KEY") and os.getenv("LANGSMITH_API_KEY"):
+        os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGSMITH_API_KEY")
+    # Enable LangSmith tracing via environment variable (already set in .env)
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+    result = app.invoke(
+        {
+            "issue_title": "Check-dicosunt not working",
+            "issue_description": "The function isnt working properly",
+            "repo_url": "https://github.com/Rhythm-208/Testing.git",
+            "file_path": "check_discount.py",
+            "iteration": 0,
+            "max_iterations": 5,
+        }
+    )
     print(result.get("status"))
     for msg in result.get("messages", []):
         print(msg)

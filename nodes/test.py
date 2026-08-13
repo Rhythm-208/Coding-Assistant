@@ -47,7 +47,6 @@ def _get_or_create_container(thread_id:str):
         nano_cpus = 1_000_000_000,
         user = "nobody",
         working_dir = "/tmp",
-        tmpfs= {"/tmp":"size=64m"},
     )
     _containers[thread_id] = container.id
     return container.id
@@ -111,7 +110,8 @@ def cleanup_container(thread_id: str) -> None:
 #Creating Node->
 
 def test_node(state: AgentState) -> dict:
-    result = run_in_sandbox(state["thread_id"], state["file_path"])
+    full_path = os.path.join(state["repo_path"],state["file_path"])
+    result = run_in_sandbox(state["thread_id"],full_path)
     passed = result["exit_code"] == 0 and not result["timed_out"]
 
     if passed:

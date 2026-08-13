@@ -33,8 +33,10 @@ def clone_repo(state:AgentState):
 
         # Bug 6: discover test files in the repo for the test node
         from pathlib import Path
-        test_files = list(Path(dest_dir).rglob("test_*.py")) + list(Path(dest_dir).rglob("*_test.py"))
-        file_path = str(test_files[0]) if test_files else ""
+        file_path = state.get("file_path")
+        if not file_path:
+            test_files = list(Path(dest_dir).rglob("test_*.py")) + list(Path(dest_dir).rglob("*_test.py"))
+            file_path = str(test_files[0]) if test_files else "check_discount.py"
 
         return {
             'clone_result': CloneResult(success=True, repo_path=dest_dir),

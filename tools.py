@@ -6,10 +6,27 @@ from langchain.tools import tool
 def read_file_numbered(file_path: str) -> str:
     """Read a file and return its content with line numbers prefixed.
         This is what we'll show the model so it can generate an accurate diff."""
-    content = Path(file_path).read_text()
-    lines = content.splitlines()
-    numbered = [f"{i + 1}: {line}" for i, line in enumerate(lines)]
-    return "\n".join(numbered)
+    try:
+        content = Path(file_path).read_text()
+        lines = content.splitlines()
+        numbered = [f"{i + 1}: {line}" for i, line in enumerate(lines)]
+        return "\n".join(numbered)
+    except FileNotFoundError:
+        return f"Error: File not found at {file_path}. Please make sure to use the absolute path starting with REPO_PATH."
+    except Exception as e:
+        return f"Error reading file {file_path}: {str(e)}"
+
+@tool
+def read_file_exact(file_path: str) -> str:
+    """Read a file and return its exact content.
+        This is what we'll show the model so it can generate an exact SEARCH block."""
+    try:
+        content = Path(file_path).read_text()
+        return content
+    except FileNotFoundError:
+        return f"Error: File not found at {file_path}. Please make sure to use the absolute path starting with REPO_PATH."
+    except Exception as e:
+        return f"Error reading file {file_path}: {str(e)}"
 
 @tool
 def list_folder_content(folder_path):
