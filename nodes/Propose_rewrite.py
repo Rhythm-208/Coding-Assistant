@@ -53,8 +53,42 @@ def _get_final_ai_text(messages):
     return ""
 
 def propose_patch(state: AgentState):
+    changes = state.get("changes_to_make", [])
+    current_change = changes[0] if changes else None
 
-    user_prompt = f"""You are a senior software engineer.
+    if current_change:
+        file_to_edit = current_change.get("file", "")
+        instruction = current_change.get("instruction", "")
+        
+        user_prompt = f"""You are a senior software engineer.
+
+TITLE: {state.get('issue_title')}
+DESCRIPTION: {state.get('issue_description')}
+DIAGNOSIS: {state.get('Diagnose')}
+REPO_PATH: {state.get('repo_path')}
+
+CURRENT TASK: You need to modify the file: {file_to_edit}
+INSTRUCTION: {instruction}
+
+Use the native function calling feature to invoke the `read_file_exact` tool to inspect the exact contents of {file_to_edit}. Do NOT output JSON text directly. CRITICAL: You MUST use absolute paths when calling read_file_exact. AFTER you have read the file, propose your changes using ONLY the SEARCH/REPLACE block format — no explanation, preamble, or markdown code fences. Your entire final response must be parseable SEARCH/REPLACE blocks."""
+        
+        inputs = {
+            "messages": [("system", SYSTEM_PROMPT),
+                         ("user", user_prompt),
+                         ]
+        }
+        response = agent.invoke(inputs)
+
+        diff_text= _get_final_ai_text(response["messages"])
+
+        return {
+            "Propose_change": diff_text, 
+            "current_change": current_change,
+            "changes_to_make": changes[1:] # Pop the processed change
+        }
+    else:
+        # Fallback for the old workflow
+        user_prompt = f"""You are a senior software engineer.
 
 TITLE: {state.get('issue_title')}
 DESCRIPTION: {state.get('issue_description')}
@@ -63,13 +97,13 @@ REPO_PATH: {state.get('repo_path')}
 
 Use the native function calling feature to invoke the `read_file_exact` tool to inspect the exact contents of the files mentioned in the diagnosis. Do NOT output JSON text directly. CRITICAL: You MUST use absolute paths (e.g., {state.get('repo_path')}/filename.py) when calling read_file_exact. AFTER you have read the files, propose your changes using ONLY the SEARCH/REPLACE block format — no explanation, preamble, or markdown code fences. Your entire final response must be parseable SEARCH/REPLACE blocks."""
 
-    inputs = {
-        "messages": [("system", SYSTEM_PROMPT),
-                     ("user", user_prompt),
-                     ]
-    }
-    response = agent.invoke(inputs)
+        inputs = {
+            "messages": [("system", SYSTEM_PROMPT),
+                         ("user", user_prompt),
+                         ]
+        }
+        response = agent.invoke(inputs)
 
-    diff_text= _get_final_ai_text(response["messages"])
+        diff_text= _get_final_ai_text(response["messages"])
 
-    return {"Propose_change": diff_text}
+        return {"Propose_change": diff_text}
