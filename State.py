@@ -6,12 +6,6 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class CloneResult:
-    success: bool
-    repo_path: str = ""
-    error_message: str = ""
-
-@dataclass
 class ValidationResult:
     valid: bool
     reason: str = ""              # why it failed, if it did
@@ -32,12 +26,9 @@ class ApplyResult:
 
 class AgentState(TypedDict):
     # --- Shared fields (both workflows) ---
-    repo_url: str
     repo_path: str
 
     messages: Annotated[List[BaseMessage],add_messages]
-
-    clone_result: CloneResult
 
     Propose_change: Optional[str]
 
@@ -46,8 +37,12 @@ class AgentState(TypedDict):
     apply_diff : Optional[ApplyResult]
 
     thread_id: Optional[str]
-    file_path: Optional[str]
+    repo_files: Optional[List[str]]
     test_result: Optional[TestResult]
+
+    plan_approval_status: Optional[str] # "approved", "rejected", "edit"
+    plan_feedback: Optional[str]
+    plan_review_skipped: Optional[bool]
 
     approved: Optional[bool]
 

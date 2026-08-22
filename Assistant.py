@@ -1,8 +1,10 @@
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 import os
 from dotenv import load_dotenv
 
 from State import AgentState
+from nodes.Initialize import initialize_workspace
 from nodes.Diagnose import Diagnose
 from nodes.Propose_rewrite import propose_patch
 from nodes.Validate_diff import validate_diff, route_after_validation
@@ -14,6 +16,7 @@ from nodes.commit import git_commit
 
 # The user will need to create this node and update state (as instructed in Arc.txt)
 from nodes.Propose_changes import propose_changes
+from nodes.Plan_review import plan_review
 
 def route_next_file(state: AgentState):
     """
@@ -27,11 +30,26 @@ def route_next_file(state: AgentState):
     else:
         return "test_node"
 
+def route_after_plan_review(state: AgentState):
+    status = state.get("plan_approval_status")
+    if status == "rejected":
+        return "end"
+    elif status == "edit":
+        return "propose_changes"
+    else: # "approved"
+        changes = state.get("changes_to_make", [])
+        if changes and len(changes) > 0:
+            return "propose_patch"
+        else:
+            return "test_node"
+
 graph = StateGraph(AgentState)
 
 # --- Add Nodes ---
+graph.add_node("initialize_workspace", initialize_workspace)
 graph.add_node("Diagnose", Diagnose)
 graph.add_node("propose_changes", propose_changes)
+graph.add_node("plan_review", plan_review)
 graph.add_node("propose_patch", propose_patch)
 graph.add_node("validate_diff", validate_diff)
 graph.add_node("apply_diff", apply_diff)
@@ -41,13 +59,16 @@ graph.add_node("git_commit", git_commit)
 graph.add_node("escalate", escalate)
 
 # --- Add Edges ---
-graph.add_edge(START, "Diagnose")
+graph.add_edge(START, "initialize_workspace")
+graph.add_edge("initialize_workspace", "Diagnose")
 graph.add_edge("Diagnose", "propose_changes")
 
+graph.add_edge("propose_changes", "plan_review")
+
 graph.add_conditional_edges(
-    "propose_changes",
-    route_next_file,
-    {"propose_patch": "propose_patch", "test_node": "test_node"}
+    "plan_review",
+    route_after_plan_review,
+    {"propose_patch": "propose_patch", "test_node": "test_node", "end": END, "propose_changes": "propose_changes"}
 )
 
 graph.add_edge("propose_patch", "validate_diff")
@@ -79,7 +100,8 @@ graph.add_conditional_edges(
 graph.add_edge("git_commit", END)
 graph.add_edge("escalate", END)
 
-app = graph.compile()
+memory = MemorySaver()
+app = graph.compile(checkpointer=memory)
 
 if __name__ == "__main__":
     load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env")))
@@ -93,12 +115,13 @@ if __name__ == "__main__":
             "prompt": "Update the authentication workflow.",
             "issue_title": "Update Auth",
             "issue_description": "We need to fix the auth bypass issue.",
-            "repo_url": "https://github.com/Rhythm-208/Testing.git",
+            "repo_path": r"C:\Users\Rhyth\Desktop\Projects\Testing",
             "iteration": 0,
             "max_iterations": 5,
             # We initialize changes_to_make empty, but it will be populated in propose_changes
             "changes_to_make": [], 
-        }
+        },
+        config={"configurable": {"thread_id": "1"}}
     )
     print(result.get("status"))
     for msg in result.get("messages", []):

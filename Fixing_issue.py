@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, START, END
 # LangSmith tracing is enabled via environment variables
 
 from State import AgentState
-from nodes.Clone import clone_repo, route_after_clone
+from nodes.Initialize import initialize_workspace
 from nodes.Diagnose import Diagnose
 from nodes.Propose_rewrite import propose_patch
 from nodes.Validate_diff import validate_diff, route_after_validation
@@ -16,7 +16,7 @@ from nodes.commit import git_commit
 graph = StateGraph(AgentState)
 
 # --- register every node ---
-graph.add_node("clone_repo", clone_repo)
+graph.add_node("initialize_workspace", initialize_workspace)
 graph.add_node("Diagnose", Diagnose)
 graph.add_node("propose_patch", propose_patch)
 graph.add_node("validate_diff", validate_diff)
@@ -27,7 +27,8 @@ graph.add_node("git_commit", git_commit)
 graph.add_node("escalate", escalate)
 
 # --- straight-line edges (no branching) ---
-graph.add_edge(START, "clone_repo")
+graph.add_edge(START, "initialize_workspace")
+graph.add_edge("initialize_workspace", "Diagnose")
 graph.add_edge("Diagnose", "propose_patch")
 graph.add_edge("propose_patch", "validate_diff")
 # validate_diff now has a conditional edge (Bug 5 fix)
@@ -35,12 +36,7 @@ graph.add_edge("apply_diff", "test_node")
 graph.add_edge("git_commit", END)
 graph.add_edge("escalate", END)
 
-# --- branching edges ---
-graph.add_conditional_edges(
-    "clone_repo",
-    route_after_clone,
-    {"Diagnose": "Diagnose", "escalate": "escalate"},
-)
+# Removed route_after_clone conditional edge
 
 # Bug 5 fix: guard rail — only apply if validation passed
 graph.add_conditional_edges(
@@ -78,7 +74,7 @@ if __name__ == "__main__":
         {
             "issue_title": "Check-dicosunt not working",
             "issue_description": "The function isnt working properly",
-            "repo_url": "https://github.com/Rhythm-208/Testing.git",
+            "repo_path": r"C:\Users\Rhyth\Desktop\Projects\Testing",
             "file_path": "check_discount.py",
             "iteration": 0,
             "max_iterations": 5,

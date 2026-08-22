@@ -16,12 +16,15 @@ You are given a DIAGNOSIS of an issue. Your task is to determine the list of fil
 """
 
 def propose_changes(state: AgentState):
+    plan_feedback = state.get('plan_feedback')
+    feedback_section = f"\nPREVIOUS PLAN FEEDBACK:\nThe user reviewed your previous plan and provided the following feedback/edit request: {plan_feedback}\nPlease incorporate this feedback into your new plan.\n" if plan_feedback else ""
+
     user_prompt = f"""
 TITLE: {state.get('issue_title')}
 DESCRIPTION: {state.get('issue_description')}
 DIAGNOSE: {state.get('Diagnose')}
 REPO_PATH: {state.get('repo_path')}
-
+{feedback_section}
 Determine the files to change and the instructions.
 """
     

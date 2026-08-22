@@ -1,6 +1,7 @@
 import subprocess
 from State import AgentState
 from nodes.test import cleanup_container
+from langgraph.types import interrupt
 
 
 def _revert_changes(repo_path: str) -> None:
@@ -17,7 +18,9 @@ def human_approval(state: AgentState) -> dict:
     print("=" * 60)
     print("This diff has already passed the test suite in the sandbox.")
 
-    decision = input("Commit this change? [y/n]: ").strip().lower()
+    decision = interrupt("Commit this change? [y/n]: ")
+    if isinstance(decision, str):
+        decision = decision.strip().lower()
 
     thread_id = state.get("thread_id")
     if thread_id:
