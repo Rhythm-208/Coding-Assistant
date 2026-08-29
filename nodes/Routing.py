@@ -23,7 +23,7 @@ def route_after_approval(state: AgentState) -> str:
       - rejected -> nothing left to do, go straight to END
     """
     if state.get("approved"):
-        return "git_commit"
+        return "end" # Skipping git_commit; webview API will apply changes directly
     return "end"
 
 
@@ -44,7 +44,7 @@ def escalate(state: AgentState) -> dict:
 
     summary = (
         f"Escalated after {state.get('iteration', 0)} attempt(s) without a passing test.\n\n"
-        f"Issue: {state.get('issue_title')}\n\n"
+        f"Issue: {state.get('message', state.get('prompt', ''))}\n\n"
         f"Last diagnosis: {state.get('Diagnose')}\n\n"
         f"Last failure:\n{last_failure}"
     )

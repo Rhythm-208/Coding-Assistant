@@ -112,6 +112,9 @@ llm = get_llm()
 # Dedicated Gemini LLM for Propose_rewrite
 propose_rewrite_llm = get_llm(model="gemini-2.5-flash")
 
+# Dedicated Gemini LLM for chatting with the user
+chat_llm = get_llm(model="gemini-2.5-flash")
+
 # ── Pre-built ReAct agents ───────────────────────────────────────────
 
 # Used by Diagnose node

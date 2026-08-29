@@ -21,20 +21,18 @@ from tools import write_file
 
 # 1. Define the Tool for the conversational agent
 @tool
-def run_coding_workflow(prompt: str, issue_title: str, issue_description: str, repo_path: str) -> str:
+def run_coding_workflow(message: str, repo_path: str) -> str:
     """
     Triggers the main coding assistant workflow to resolve an issue in a repository.
     Use this tool when the user asks you to fix a bug, implement a feature, or change code in a repository.
-    You MUST gather the prompt, issue_title, issue_description, and repo_path from the user before calling this.
+    You MUST gather the message (describing what is wrong) and repo_path from the user before calling this.
     """
     
     try:
         worflow_thread_id = str(uuid.uuid4())
         result = assistant_workflow.invoke(
             {
-                "prompt": prompt,
-                "issue_title": issue_title,
-                "issue_description": issue_description,
+                "message": message,
                 "repo_path": repo_path,
                 "iteration": 0,
                 "max_iterations": 4,
@@ -55,7 +53,7 @@ chat_agent = create_agent(
     tools=[run_coding_workflow, write_file],
     checkpointer=memory,
     system_prompt="""You are a helpful conversational AI coding assistant. You chat with the user to understand their coding problems. 
-                    Once you have enough information (a clear prompt, an issue title, a description, and the repository path), 
+                    Once you have enough information (a single clear message describing what is wrong or what file to check, and the repository path), 
                       you should use the run_coding_workflow tool to actually fix the code. 
                           If you are missing information (like the repository path), politely ask the user for it. 
                              You can also write files if necessary."""

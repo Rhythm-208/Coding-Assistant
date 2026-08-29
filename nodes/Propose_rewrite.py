@@ -62,8 +62,7 @@ def propose_patch(state: AgentState):
         
         user_prompt = f"""You are a senior software engineer.
 
-TITLE: {state.get('issue_title')}
-DESCRIPTION: {state.get('issue_description')}
+MESSAGE: {state.get('message', state.get('prompt', ''))}
 DIAGNOSIS: {state.get('Diagnose')}
 REPO_PATH: {state.get('repo_path')}
 
@@ -90,8 +89,7 @@ Use the native function calling feature to invoke the `read_file_exact` tool to 
         # Fallback for the old workflow
         user_prompt = f"""You are a senior software engineer.
 
-TITLE: {state.get('issue_title')}
-DESCRIPTION: {state.get('issue_description')}
+MESSAGE: {state.get('message', state.get('prompt', ''))}
 DIAGNOSIS: {state.get('Diagnose')}
 REPO_PATH: {state.get('repo_path')}
 

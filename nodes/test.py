@@ -65,10 +65,13 @@ def _write_file_to_container(container,path:str,content:str)->None:
     container.put_archive("/tmp", tarstream)
 
 
-def run_in_sandbox(thread_id:str,file_path:str)->dict:
+def run_in_sandbox(thread_id:str,file_path:str, virtual_files: dict = None)->dict:
 
-    with open(file_path,"r") as f:
-        code =f.read()
+    if virtual_files and file_path in virtual_files:
+        code = virtual_files[file_path]
+    else:
+        with open(file_path,"r") as f:
+            code = f.read()
 
     container_id = _get_or_create_container(thread_id)
     container = _get_client().containers.get(container_id)
@@ -111,7 +114,7 @@ def cleanup_container(thread_id: str) -> None:
 
 def test_node(state: AgentState) -> dict:
     full_path = os.path.join(state["repo_path"],state["file_path"])
-    result = run_in_sandbox(state["thread_id"],full_path)
+    result = run_in_sandbox(state["thread_id"], full_path, state.get("virtual_files"))
     passed = result["exit_code"] == 0 and not result["timed_out"]
 
     if passed:

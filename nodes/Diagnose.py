@@ -55,9 +55,8 @@ def Diagnose(state: AgentState) -> AgentState:
     repo_path = state.get("repo_path", "")
     repo_contents = _read_repo_files(repo_path)
 
-    prompt = f"""You are a senior software developer. There is the following issue:
-issue_title: {state["issue_title"]}
-issue_description: {state["issue_description"]}
+    prompt = f"""You are a senior software developer. There is the following issue/request:
+message: {state.get("message", state.get("prompt", ""))}
 repo_path: {repo_path}
 
 Below are ALL the files in the repository (with line numbers).

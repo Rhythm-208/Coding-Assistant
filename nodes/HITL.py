@@ -4,21 +4,28 @@ from nodes.test import cleanup_container
 from langgraph.types import interrupt
 
 
-def _revert_changes(repo_path: str) -> None:
-    subprocess.run(["git", "checkout", "--", "."], cwd=repo_path, capture_output=True)
-
-
 def human_approval(state: AgentState) -> dict:
     diff_text = state["validation_result"].cleaned_diff
 
     print("\n" + "=" * 60)
-    print(f"PROPOSED FIX FOR: {state.get('issue_title')}")
+    print(f"PROPOSED FIX FOR: {state.get('message', state.get('prompt', ''))}")
     print("=" * 60)
     print(diff_text)
     print("=" * 60)
     print("This diff has already passed the test suite in the sandbox.")
 
-    decision = interrupt("Commit this change? [y/n]: ")
+    decision = interrupt({
+        "type": "human_approval",
+        "diff": diff_text,
+        "message": "Commit this change? [y/n]: "
+    })
+    
+    if isinstance(decision, dict):
+        if decision.get("approved"):
+            decision = "y"
+        else:
+            decision = "n"
+            
     if isinstance(decision, str):
         decision = decision.strip().lower()
 
@@ -27,11 +34,10 @@ def human_approval(state: AgentState) -> dict:
         cleanup_container(thread_id)  # sandbox's job is done either way, win or lose
 
     if decision == "y":
-        return {"approved": True, "messages": [("assistant", "Approved - committing now.")]}
+        return {"approved": True, "status": "done", "messages": [("assistant", "Approved - changes will be applied to your workspace.")]}
 
-    _revert_changes(state["repo_path"])
     return {
         "approved": False,
         "status": "rejected",
-        "messages": [("assistant", "Change rejected by human, reverted.")],
+        "messages": [("assistant", "Change rejected by human.")],
     }

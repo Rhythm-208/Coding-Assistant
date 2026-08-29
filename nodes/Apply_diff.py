@@ -28,26 +28,33 @@ def apply_diff(state: AgentState):
     target_file = current_change.get("file") if current_change else None
         
     try:
+        virtual_files = state.get("virtual_files", {}).copy()
+        
         for b in blocks:
             filepath = b["file"]
             if target_file and filepath != target_file:
                 # Enforce that only the target file is modified
                 raise ValueError(f"Attempted to modify {filepath}, but current target is {target_file}")
                 
-            content = Path(filepath).read_text()
+            # read from virtual_files if available, otherwise from disk
+            content = virtual_files.get(filepath)
+            if content is None:
+                content = Path(filepath).read_text()
+                
             if b["search"] not in content:
                 raise ValueError(f"Search block not found in {filepath} during apply.")
             
             # replace only the first occurrence
             new_content = content.replace(b["search"], b["replace"], 1)
-            Path(filepath).write_text(new_content)
+            virtual_files[filepath] = new_content
+            
     except Exception as e:
          return {'apply_diff': ApplyResult(
             success=False,
             error_message=f"Failed to apply SEARCH/REPLACE blocks: {str(e)}",
         )}
 
-    return {'apply_diff': ApplyResult(success=True)}
+    return {'apply_diff': ApplyResult(success=True), 'virtual_files': virtual_files}
 
 
 

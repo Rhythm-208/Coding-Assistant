@@ -39,6 +39,7 @@ class AgentState(TypedDict):
     thread_id: Optional[str]
     repo_files: Optional[List[str]]
     test_result: Optional[TestResult]
+    virtual_files: Optional[dict] # tracks modified file content without writing to disk
 
     plan_approval_status: Optional[str] # "approved", "rejected", "edit"
     plan_feedback: Optional[str]
@@ -54,8 +55,7 @@ class AgentState(TypedDict):
     Prev_Failed_Diagnose : Annotated[List[BaseMessage],add_messages]
 
     # --- Fixing_issue workflow fields ---
-    issue_title: Optional[str]
-    issue_description: Optional[str]
+    message: Optional[str]
     Diagnose: Optional[str]
 
     # --- Changes workflow fields ---

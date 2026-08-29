@@ -12,7 +12,6 @@ from nodes.Apply_diff import apply_diff
 from nodes.test import test_node
 from nodes.HITL import human_approval
 from nodes.Routing import route_after_test, route_after_approval, escalate
-from nodes.commit import git_commit
 
 # The user will need to create this node and update state (as instructed in Arc.txt)
 from nodes.Propose_changes import propose_changes
@@ -55,7 +54,6 @@ graph.add_node("validate_diff", validate_diff)
 graph.add_node("apply_diff", apply_diff)
 graph.add_node("test_node", test_node)
 graph.add_node("human_approval", human_approval)
-graph.add_node("git_commit", git_commit)
 graph.add_node("escalate", escalate)
 
 # --- Add Edges ---
@@ -94,10 +92,9 @@ graph.add_conditional_edges(
 graph.add_conditional_edges(
     "human_approval",
     route_after_approval,
-    {"git_commit": "git_commit", "end": END}
+    {"end": END}
 )
 
-graph.add_edge("git_commit", END)
 graph.add_edge("escalate", END)
 
 memory = MemorySaver()
@@ -112,9 +109,7 @@ if __name__ == "__main__":
     # Example Invocation
     result = app.invoke(
         {
-            "prompt": "Update the authentication workflow.",
-            "issue_title": "Update Auth",
-            "issue_description": "We need to fix the auth bypass issue.",
+            "message": "We need to fix the auth bypass issue.",
             "repo_path": r"C:\Users\Rhyth\Desktop\Projects\Testing",
             "iteration": 0,
             "max_iterations": 5,
