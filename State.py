@@ -37,6 +37,7 @@ class AgentState(TypedDict):
     apply_diff : Optional[ApplyResult]
 
     thread_id: Optional[str]
+    file_path: Optional[str] # The script to run in the sandbox for testing
     repo_files: Optional[List[str]]
     test_result: Optional[TestResult]
     virtual_files: Optional[dict] # tracks modified file content without writing to disk

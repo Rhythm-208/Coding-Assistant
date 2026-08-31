@@ -29,7 +29,7 @@ pending_interrupts: dict[str, dict] = {}
  
 _agent_cache: dict[str, object] = {}        # chat_thread_id -> compiled chat agent (built once, reused)
 _session_repo_paths: dict[str, str] = {}    # chat_thread_id -> repo_path, OVERWRITTEN on every request
-memory = MemorySaver()
+memory = InMemorySaver()
  
  
 # ── Interrupt helpers ─────────────────────────────────────────────────
@@ -77,11 +77,18 @@ def _run_workflow(workflow_thread_id: str, input_data) -> dict:
 # generic handlers below instead of crashing or resuming with None.
  
 def _describe_plan_review(interrupt: dict) -> str:
-    files = ", ".join(c.get("file", c.get("file_path", "unknown file")) for c in interrupt.get("changes_to_make", []))
-    return (
-        f"Here's my proposed plan — I'd touch: {files}.\n\n"
-        f"Reply 'y' to proceed, 'n' to cancel, or tell me what to change about the plan."
-    )
+    changes = interrupt.get("changes_to_make", [])
+    if not changes:
+        return "Here is my proposed plan — I have no files to change.\n\nReply 'y' to proceed anyway, 'n' to cancel, or tell me what to change about the plan."
+    
+    plan_text = "Here's my proposed plan:\n\n"
+    for c in changes:
+        file_path = c.get("file", c.get("file_path", "unknown file"))
+        instruction = c.get("instruction", "No specific instruction provided.")
+        plan_text += f"• **{file_path}**: {instruction}\n"
+        
+    plan_text += "\nReply 'y' to proceed, 'n' to cancel, or tell me what to change about the plan."
+    return plan_text
  
  
 def _resolve_plan_review(message: str, raw: dict) -> dict:
@@ -223,11 +230,7 @@ def _build_chat_agent(chat_thread_id: str):
         chat_llm,
         tools=[run_assistant],
         checkpointer=memory,
-        middleware = [
-            HumanInTheLoopMiddleware={
-
-            }
-        ]
+       
         system_prompt="""You are a proactive AI coding assistant. \
 The repository you are working in is already loaded — do NOT ask the user for a path.
  
@@ -346,7 +349,16 @@ async def chat_endpoint(request: ChatRequest):
                 },
             }
             result = agent.invoke({"messages": [("user", message)]}, config=config)
-            return result["messages"][-1].content
+            content = result["messages"][-1].content
+            if isinstance(content, list):
+                parts = []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        parts.append(block.get("text", ""))
+                    elif isinstance(block, str):
+                        parts.append(block)
+                return "\n".join(parts)
+            return str(content)
  
         response_text = _invoke_chat_agent(request.message)
         return ChatResponse(response=response_text)

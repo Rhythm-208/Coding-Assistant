@@ -39,8 +39,8 @@ def route_after_plan_review(state: AgentState):
         changes = state.get("changes_to_make", [])
         if changes and len(changes) > 0:
             return "propose_patch"
-        else:
-            return "test_node"
+    
+    return "propose_patch"
 
 graph = StateGraph(AgentState)
 
