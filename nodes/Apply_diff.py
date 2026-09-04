@@ -2,9 +2,12 @@ from State import AgentState , ApplyResult
 from pathlib import Path
 from nodes.Validate_diff import parse_search_replace_blocks
 
+# Import persistence helper
+from utils.file_persist import apply_changes
+
 # add guard rrail to check if the diff is validated
 
-def apply_diff(state: AgentState):
+def apply_diff(state: AgentState, auto_apply: bool = False):
     validation = state.get('validation_result')
     if not validation:
         return {'apply_diff': ApplyResult(success=False, error_message="No validation result found.")}
@@ -53,6 +56,12 @@ def apply_diff(state: AgentState):
             success=False,
             error_message=f"Failed to apply SEARCH/REPLACE blocks: {str(e)}",
         )}
+
+    # Persist changes to real files if auto_apply is requested.
+    # Loop over ALL modified files — fixes the previous single-file bug.
+    if auto_apply:
+        for filepath, new_content in virtual_files.items():
+            apply_changes(filepath, new_content)
 
     return {'apply_diff': ApplyResult(success=True), 'virtual_files': virtual_files}
 

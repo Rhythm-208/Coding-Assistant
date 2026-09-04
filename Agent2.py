@@ -114,6 +114,58 @@ def _resolve_human_approval(message: str, raw: dict) -> dict:
     if text in ("n", "no"):
         return {"approved": False}
     return {"approved": False, "feedback": message}
+
+
+def _describe_diff_review(interrupt: dict) -> str:
+    """
+    Renders a structured diff-review message for the VS Code WebView.
+
+    The WebView detects the ```diff-review fenced block and renders an
+    interactive per-file diff viewer with Accept / Decline buttons.
+    Falls back gracefully to plain-text if the frontend doesn't support it.
+    """
+    import json
+    files = interrupt.get("files", [])
+    file_list = "\n".join(f"  • `{f['file']}`" for f in files)
+    header = (
+        f"✅ Tests passed! I've prepared changes to **{len(files)} file(s)**:\n"
+        f"{file_list}\n\n"
+        "Review the diff below. Click **Accept** / **Decline** per file, "
+        "or reply `all` to accept everything, `none` to reject everything, "
+        "or type specific filenames separated by commas.\n\n"
+    )
+    # Fenced block the WebView parses to render the rich diff UI
+    payload_block = f"```diff-review\n{json.dumps(files, indent=2)}\n```"
+    return header + payload_block
+
+
+def _resolve_diff_review(message: str, raw: dict) -> dict:
+    """
+    Maps the user's plain-text reply (or a structured JSON reply from the
+    WebView Accept/Decline buttons) back to {accepted_files, declined_files}.
+    """
+    import json
+    all_paths = [f["file"] for f in raw.get("files", [])]
+
+    # WebView buttons post a JSON string: {"accepted_files": [...], "declined_files": [...]}
+    try:
+        parsed = json.loads(message)
+        if isinstance(parsed, dict) and "accepted_files" in parsed:
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    text = message.strip().lower()
+    if text in ("y", "yes", "all"):
+        return {"accepted_files": all_paths, "declined_files": []}
+    if text in ("n", "no", "none"):
+        return {"accepted_files": [], "declined_files": all_paths}
+
+    # Treat as a comma/space-separated list of accepted filenames
+    tokens = [t.strip() for t in message.replace(",", " ").split()]
+    accepted = [p for p in all_paths if any(tok in p for tok in tokens)]
+    declined = [p for p in all_paths if p not in accepted]
+    return {"accepted_files": accepted, "declined_files": declined}
  
  
 def _describe_generic(interrupt: dict) -> str:
@@ -142,8 +194,9 @@ def _resolve_generic(message: str, raw: dict) -> dict:
  
  
 INTERRUPT_HANDLERS: dict[str, dict] = {
-    "plan_review": {"describe": _describe_plan_review, "resolve": _resolve_plan_review},
-    "human_approval": {"describe": _describe_human_approval, "resolve": _resolve_human_approval},
+    "plan_review":   {"describe": _describe_plan_review,   "resolve": _resolve_plan_review},
+    "human_approval":{"describe": _describe_human_approval,"resolve": _resolve_human_approval},
+    "diff_review":   {"describe": _describe_diff_review,   "resolve": _resolve_diff_review},
     # Add one line per new Assistant.py interrupt type, e.g.:
     # "test_failure_review": {"describe": _describe_test_failure_review, "resolve": _resolve_test_failure_review},
     # "clarification_needed": {"describe": _describe_clarification, "resolve": _resolve_clarification},

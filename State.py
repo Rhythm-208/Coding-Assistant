@@ -66,3 +66,7 @@ class AgentState(TypedDict):
     # --- Assistant Workflow specific tracking fields ---
     changes_to_make: list[dict]
     current_change: Optional[dict]
+
+    # Structured per-file accept/decline decision from diff_review_hitl
+    # Shape: {"accepted_files": [...], "declined_files": [...]}
+    diff_review_decision: Optional[dict]

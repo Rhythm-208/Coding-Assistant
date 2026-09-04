@@ -10,8 +10,9 @@ from nodes.Propose_rewrite import propose_patch
 from nodes.Validate_diff import validate_diff, route_after_validation
 from nodes.Apply_diff import apply_diff
 from nodes.test import test_node
-from nodes.HITL import human_approval
-from nodes.Routing import route_after_test, route_after_approval, escalate
+from nodes.Diff_review_hitl import diff_review_hitl
+from nodes.Persist_approved import persist_approved
+from nodes.Routing import route_after_test, escalate
 
 # The user will need to create this node and update state (as instructed in Arc.txt)
 from nodes.Propose_changes import propose_changes
@@ -53,7 +54,8 @@ graph.add_node("propose_patch", propose_patch)
 graph.add_node("validate_diff", validate_diff)
 graph.add_node("apply_diff", apply_diff)
 graph.add_node("test_node", test_node)
-graph.add_node("human_approval", human_approval)
+graph.add_node("diff_review_hitl", diff_review_hitl)   # NEW: rich per-file diff review
+graph.add_node("persist_approved", persist_approved)   # NEW: write accepted files to disk
 graph.add_node("escalate", escalate)
 
 # --- Add Edges ---
@@ -86,14 +88,13 @@ graph.add_conditional_edges(
 graph.add_conditional_edges(
     "test_node",
     route_after_test,
-    {"human_approval": "human_approval", "escalate": "escalate", "Diagnose": "Diagnose"}
+    # Routes to diff_review_hitl instead of old human_approval
+    {"human_approval": "diff_review_hitl", "escalate": "escalate", "Diagnose": "Diagnose"}
 )
 
-graph.add_conditional_edges(
-    "human_approval",
-    route_after_approval,
-    {"end": END}
-)
+# After rich diff review: write only accepted files then finish
+graph.add_edge("diff_review_hitl", "persist_approved")
+graph.add_edge("persist_approved", END)
 
 graph.add_edge("escalate", END)
 
