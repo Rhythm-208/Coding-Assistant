@@ -126,3 +126,23 @@ The response will either be a normal chat reply, or — once the workflow kicks 
 - Diffs are always generated as targeted `SEARCH/REPLACE` blocks rather than full-file rewrites, and files matching test-path patterns are never modified.
 - Every workflow run gets its own `thread_id`, separate from the chat session's `thread_id`, so the underlying LangGraph checkpointer can track multiple in-flight workflows without cross-talk.
 - `max_iterations` (default 4 in `Agent2.py`) bounds the Diagnose → patch → test retry loop before the run escalates instead of looping forever.
+
+## Last Improvements
+
+### 1. Yes / No Buttons for HITL Instead of Typing `y` / `n`
+
+The current HITL checkpoints (`plan_review` and `human_approval`) require the user to type `y` or `n` in plain text. This is error-prone and feels raw. The improvement would replace free-text input with explicit **Yes** and **No** action buttons surfaced directly in the chat UI (or a dedicated review panel in the VS Code extension). The interrupt handler on the backend already receives a structured payload, so the front-end only needs to send the correct pre-formed string — no backend change is strictly required, but the `INTERRUPT_HANDLERS` in `Agent2.py` should be updated to accept a cleaner boolean/enum payload for robustness.
+
+### 2. Show Diffs Inside the Actual File (Inline Diff View)
+
+At the `human_approval` checkpoint the workflow currently prints the `SEARCH/REPLACE` diff blocks as raw text in the chat. The improvement would render the diff **inline inside the affected file** — i.e., open a diff editor tab (VS Code's built-in `vscode.diff` command) that shows the original file on the left and the proposed change on the right, with additions highlighted in green and deletions in red. This gives the reviewer full context (surrounding code, imports, indentation) instead of an isolated patch snippet. The `apply_diff` node already holds both the original content and the patched content in state, so exposing them through the interrupt payload is straightforward.
+
+### 3. Overall Workflow Improvements
+
+Several areas where the workflow can be made smarter and more reliable:
+
+- **Parallel patch generation** — `propose_patch` currently processes planned files sequentially. Files that are independent of each other could be patched in parallel (e.g. via `asyncio.gather`) to cut wall-clock time on multi-file fixes.
+- **Smarter retry routing** — when `validate_diff` fails, the graph currently routes back to `Diagnose`. A lighter alternative would be to route back only to `propose_patch` with the validation error injected into the prompt, avoiding a full re-diagnosis for what is often just a whitespace or context-mismatch issue.
+- **Incremental test feedback** — `test_node` captures stdout/stderr from Docker but only surfaces a pass/fail signal to the retry loop. Passing the captured error output directly into the `Diagnose` prompt on the next retry would give the LLM much richer signal and reduce unnecessary iterations.
+- **Persistent virtual file store** — `apply_diff` writes to disk immediately. Keeping changes in an in-memory virtual store until `human_approval` is granted would make the "discard" path a no-op (no rollback needed) and prevent partial writes from leaving the repo in a broken state if the session is interrupted.
+- **Plan diffing on re-plan** — when the user rejects a plan and provides feedback, the new plan is shown in full. Highlighting what *changed* between the previous plan and the revised one (added/removed/modified steps) would help the user quickly verify their feedback was incorporated.
