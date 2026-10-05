@@ -14,18 +14,6 @@ def route_after_test(state: AgentState) -> str:
     return "Diagnose"
 
 
-def route_after_approval(state: AgentState) -> str:
-    """
-    Runs after human_approval. That node already did the real work for
-    the rejection path (reverted the working tree, set status="rejected"),
-    so this function only needs to decide where to route next:
-      - approved -> git_commit actually performs the commit
-      - rejected -> nothing left to do, go straight to END
-    """
-    if state.get("approved"):
-        return "end" # Skipping git_commit; webview API will apply changes directly
-    return "end"
-
 
 def escalate(state: AgentState) -> dict:
     # revert whatever the last apply_diff left in the working tree - we

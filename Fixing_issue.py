@@ -9,9 +9,14 @@ from nodes.Validate_diff import validate_diff, route_after_validation
 from nodes.Apply_diff import apply_diff
 from nodes.test import test_node
 from nodes.HITL import human_approval
-from nodes.Routing import route_after_test, route_after_approval, escalate
-from nodes.commit import git_commit
+from nodes.Routing import route_after_test, escalate
 
+def route_next_file(state: AgentState):
+    changes = state.get("changes_to_make", [])
+    if changes and len(changes) > 0:
+        return "propose_patch"
+    else:
+        return "test_node"
 
 graph = StateGraph(AgentState)
 
@@ -23,7 +28,7 @@ graph.add_node("validate_diff", validate_diff)
 graph.add_node("apply_diff", apply_diff)
 graph.add_node("test_node", test_node)
 graph.add_node("human_approval", human_approval)
-graph.add_node("git_commit", git_commit)
+
 graph.add_node("escalate", escalate)
 
 # --- straight-line edges (no branching) ---
@@ -32,8 +37,8 @@ graph.add_edge("initialize_workspace", "Diagnose")
 graph.add_edge("Diagnose", "propose_patch")
 graph.add_edge("propose_patch", "validate_diff")
 # validate_diff now has a conditional edge (Bug 5 fix)
-graph.add_edge("apply_diff", "test_node")
-graph.add_edge("git_commit", END)
+# apply_diff routes back to propose_patch if there are more files, else test_node
+
 graph.add_edge("escalate", END)
 
 # Removed route_after_clone conditional edge
@@ -42,7 +47,13 @@ graph.add_edge("escalate", END)
 graph.add_conditional_edges(
     "validate_diff",
     route_after_validation,
-    {"apply_diff": "apply_diff", "Diagnose": "Diagnose", "escalate": "escalate"},
+    {"apply_diff": "apply_diff", "propose_patch": "propose_patch", "escalate": "escalate"},
+)
+
+graph.add_conditional_edges(
+    "apply_diff",
+    route_next_file,
+    {"propose_patch": "propose_patch", "test_node": "test_node"}
 )
 
 graph.add_conditional_edges(
@@ -51,11 +62,7 @@ graph.add_conditional_edges(
     {"human_approval": "human_approval", "escalate": "escalate", "Diagnose": "Diagnose"},
 )
 
-graph.add_conditional_edges(
-    "human_approval",
-    route_after_approval,
-    {"git_commit": "git_commit", "end": END},
-)
+graph.add_edge("human_approval", END)
 
 app = graph.compile()
 

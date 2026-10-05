@@ -26,7 +26,6 @@ if not os.getenv("LOCAL_LLM_ENDPOINT"):
 
 # Standard imports after env handling
 from langchain_core.rate_limiters import InMemoryRateLimiter
-from langgraph.prebuilt import create_react_agent
 
 # Conditional imports for different LLM providers (installed lazily)
 try:
@@ -39,7 +38,6 @@ try:
 except ImportError:
     ChatOpenAI = None
 
-from tools import read_file_numbered, list_folder_content, read_file_exact
 
 # Stay safely under the 30 RPM free‑tier limit for Gemini (≈24 req/min)
 _rate_limiter = InMemoryRateLimiter(
@@ -47,10 +45,6 @@ _rate_limiter = InMemoryRateLimiter(
     check_every_n_seconds=0.5,
     max_bucket_size=5,          # allow small bursts
 )
-
-
-# ── shared tools list ────────────────────────────────────────────────
-_tools = [read_file_numbered, list_folder_content, read_file_exact]
 
 
 # ── LLM instances ────────────────────────────────────────────────────
@@ -109,22 +103,14 @@ def get_llm(model=None, **kwargs):
 # don't create multiple ChatGoogleGenerativeAI objects unnecessarily.
 llm = get_llm()
 
-# Dedicated Gemini LLM for Propose_rewrite
-propose_rewrite_llm = get_llm(model="gemini-2.5-flash")
-
-# Dedicated Gemini LLM for chatting with the user
-chat_llm = get_llm(model="gemini-2.5-flash")
+# Shared Gemini 2.5 Flash instance – used by both propose_patch and the chat
+# layer.  Previously two identical instances were created; merging them lets
+# the rate-limiter account for both paths correctly.
+flash_llm = get_llm(model="gemini-2.5-flash")
+propose_rewrite_llm = flash_llm
+chat_llm = flash_llm
 
 # ── Pre-built ReAct agents ───────────────────────────────────────────
-
-# Used by Diagnose node
-diagnose_agent = create_react_agent(llm, tools=_tools)
-
-# Used by Analyze node
-analyze_agent = create_react_agent(llm, tools=_tools)
-
-# Used by Propose_rewrite node (propose_patch)
-propose_rewrite_agent = create_react_agent(propose_rewrite_llm, tools=_tools)
-
-# Used by Propose_code_changes node
-propose_code_changes_agent = create_react_agent(llm, tools=_tools)
+# NOTE: diagnose_agent, analyze_agent, and propose_code_changes_agent were
+# previously created here but never imported by any node.  They have been
+# removed to avoid wasting memory and rate-limiter tokens at import time.

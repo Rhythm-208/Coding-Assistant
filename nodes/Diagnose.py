@@ -41,7 +41,21 @@ def _read_repo_files(repo_path: str, max_file_size: int = 50_000) -> str:
     return "\n\n".join(parts)
 
 
-def Diagnose(state: AgentState) -> AgentState:
+from pydantic import BaseModel, Field
+from typing import List
+
+class FileChange(BaseModel):
+    file: str = Field(description="Absolute path to the file to change or create")
+    instruction: str = Field(description="Specific instruction for what to change or create in the file")
+    action: str = Field(default="edit", description="'create' for a brand-new file that does not exist yet, 'edit' to modify an existing file")
+
+class DiagnoseAndPlan(BaseModel):
+    diagnosis: str = Field(description="What is wrong, in which files, and what needs to be changed.")
+    changes_to_make: List[FileChange]
+    file_path: str = Field(description="The absolute path of a single file in the repository that should be executed to verify the code runs without errors.")
+
+
+def Diagnose(state: AgentState) -> dict:
     # Gather previous failed attempts so the LLM doesn't repeat them
     prev_failures = state.get("Prev_Failed_Diagnose", [])
     failure_context = ""
@@ -51,30 +65,51 @@ def Diagnose(state: AgentState) -> AgentState:
             content = msg.content if hasattr(msg, "content") else str(msg)
             failure_context += f"- {content}\n"
 
-    # Read the full repo into a string context
+    plan_feedback = state.get('plan_feedback')
+    feedback_section = f"\nPREVIOUS PLAN FEEDBACK:\nThe user reviewed your previous plan and provided the following feedback/edit request: {plan_feedback}\nPlease incorporate this feedback into your new plan.\n" if plan_feedback else ""
+
+    # Read the full repo into a string context — cached across retries
     repo_path = state.get("repo_path", "")
-    repo_contents = _read_repo_files(repo_path)
+    repo_contents = state.get("repo_contents")
+    if not repo_contents:
+        repo_contents = _read_repo_files(repo_path)
 
     prompt = f"""You are a senior software developer. There is the following issue/request:
 message: {state.get("message", state.get("prompt", ""))}
 repo_path: {repo_path}
+{feedback_section}
 
 Below are ALL the files in the repository (with line numbers).
-Read them carefully, then give a diagnosis: what is wrong, in which files,
-and what needs to be changed.
+Read them carefully, then:
+1. Diagnose what is wrong, in which files, and what needs to be changed.
+2. Determine the list of files that need to be changed, and a specific instruction for what to change in each file.
+3. Provide the absolute path of a single file in the repository that can be run (e.g., the main entrypoint or a relevant script) to check if the changes successfully run without errors.
 
-We do NOT need you to change the code — only diagnose and tell us
-what is wrong and in what files.{failure_context}
+If the fix requires creating a new file that does not exist yet, set action to "create" for that entry.
+If modifying an existing file, set action to "edit" (the default).
+{failure_context}
 
 ─── REPOSITORY FILES ───
 {repo_contents}
 """
 
-    # Simple LLM call — no agent / tool-calling needed
-    response = llm.invoke(prompt)
-    final_answer = response.content
+    structured_llm = llm.with_structured_output(DiagnoseAndPlan)
+    response = structured_llm.invoke(prompt)
+
+    if response:
+        changes = [change.model_dump() for change in response.changes_to_make]
+        file_path = response.file_path
+        final_answer = response.diagnosis
+    else:
+        changes = []
+        file_path = ""
+        final_answer = "Failed to generate diagnosis."
 
     return {
         "Diagnose": final_answer,
+        "repo_contents": repo_contents,  # cache for subsequent retries
         "Prev_Failed_Diagnose": [("assistant", f"Failed diagnosis attempt: {final_answer}")],
+        "changes_to_make": changes,
+        "file_path": file_path
     }
+

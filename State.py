@@ -58,6 +58,7 @@ class AgentState(TypedDict):
     # --- Fixing_issue workflow fields ---
     message: Optional[str]
     Diagnose: Optional[str]
+    repo_contents: Optional[str]  # cached repo text to avoid re-reading on retries
 
     # --- Changes workflow fields ---
     prompt: Optional[str]           # user's natural-language change request

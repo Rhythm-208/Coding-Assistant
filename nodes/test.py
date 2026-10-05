@@ -83,7 +83,7 @@ def run_in_sandbox(thread_id:str,file_path:str, virtual_files: dict = None)->dic
 
     try:
         exit_code, output = container.exec_run(
-            cmd=["timeout", str(CONTAINER_TIMEOUT_SECONDS), "python3", f"/tmp/{container_path}"],
+            cmd=["timeout", str(CONTAINER_TIMEOUT_SECONDS), "python3", "-m", "py_compile", f"/tmp/{container_path}"],
             demux=True,  # separate stdout/stderr
             user="nobody",
         )

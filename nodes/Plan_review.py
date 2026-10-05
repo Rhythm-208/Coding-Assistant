@@ -6,6 +6,10 @@ def plan_review(state: AgentState) -> dict:
         # The user requested to skip the plan review on the second pass after an edit.
         # We reset it so if a completely new plan is generated later, it can be reviewed.
         return {"plan_approval_status": "approved", "plan_review_skipped": False}
+        
+    if state.get("iteration", 0) > 0:
+        # On test failure retries, auto-approve the new plan to avoid spamming the user
+        return {"plan_approval_status": "approved"}
 
     changes = state.get("changes_to_make", [])
     

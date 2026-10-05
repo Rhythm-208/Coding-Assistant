@@ -20,39 +20,39 @@ initialize_workspace
      Diagnose ◄────────────────────────┐
         │                              │
         ▼                              │
-  propose_changes                      │
-        │                              │
-        ▼                              │
    plan_review  (HITL: approve/reject/edit)
         │
         ▼
-  propose_patch ◄───┐                  │
-        │            │                 │
-        ▼            │                 │
-  validate_diff ──────┘ (invalid → Diagnose, or → escalate)
+  propose_patch ◄───┐
+        │           │
+        ▼           │
+  validate_diff ────┘ (invalid → propose_patch, or → escalate)
         │
         ▼
    apply_diff ──► (more files? → propose_patch)
-        │
+        │ (no more files)
         ▼
    test_node  (runs in a Docker sandbox) ──(fail, retries left)──► Diagnose
         │
         ▼ (pass)
-  human_approval  (HITL: commit y/n)
+ diff_review_hitl (HITL: per-file accept/decline)
+        │
+        ▼
+ persist_approved (writes changes to disk)
         │
         ▼
        END
 ```
 
 - **`initialize_workspace`** — walks `repo_path`, builds a file listing, and creates a workflow thread id.
-- **`Diagnose`** — a ReAct agent (reads files via `read_file_numbered` / `read_file_exact` / `list_folder_content`) that investigates the issue and produces a diagnosis.
-- **`propose_changes`** — turns the diagnosis into a structured plan: a list of `{file, instruction}` changes plus an entry-point file to run for a sanity check.
-- **`plan_review`** — **pauses the graph** (`interrupt`) and shows the plan to the user. They can approve, reject, or send free-text feedback that loops back into `propose_changes`.
-- **`propose_patch`** — for each planned file, a dedicated LLM writes the fix as `SEARCH/REPLACE` diff blocks (never full-file rewrites), reading the exact current file contents first.
-- **`validate_diff`** — parses the SEARCH/REPLACE blocks, checks they cleanly match the file content, and blocks any edits to test files.
-- **`apply_diff`** — writes the validated change to disk (or virtual file store) and loops back to `propose_patch` until every planned file is done.
-- **`test_node`** — copies the repo into a `python:3.11-slim` Docker container and runs the target file, capturing pass/fail/timeout.
-- **`human_approval`** — **pauses the graph** again, shows the final diff (which already passed tests), and waits for the user to commit or discard it.
+- **`Diagnose`** — a ReAct agent (reads files via `read_file_numbered` / `read_file_exact` / `list_folder_content`) that investigates the issue, produces a diagnosis, and outputs a structured plan: a list of `{file, instruction}` changes plus an entry-point file to run for a sanity check.
+- **`plan_review`** — **pauses the graph** (`interrupt`) and shows the plan to the user. They can approve, reject, or send free-text feedback that loops back into `Diagnose`.
+- **`propose_patch`** — pops one planned file at a time. It uses a dedicated LLM to write the fix. For file creations, it outputs the full file content. For edits, it uses `SEARCH/REPLACE` diff blocks.
+- **`validate_diff`** — parses the diff blocks, checks they cleanly match the current file content, and blocks edits to test files. Invalid diffs route back to `propose_patch`.
+- **`apply_diff`** — applies the validated change to a memory `virtual_files` dictionary. If there are more files in the plan, it routes back to `propose_patch` to process the next one.
+- **`test_node`** — copies the repo and the `virtual_files` into a `python:3.11-slim` Docker container and runs the target file, capturing pass/fail/timeout.
+- **`diff_review_hitl`** — **pauses the graph** to present a rich, per-file diff review. The user can accept or decline changes on a per-file basis.
+- **`persist_approved`** — takes the accepted files from `diff_review_hitl` and finally writes them to the actual disk.
 - **`escalate`** — reached after too many failed iterations (`max_iterations`); ends the run without applying anything.
 
 ### Chat layer (`Agent2.py`)
@@ -71,7 +71,7 @@ initialize_workspace
 | `State.py` | `AgentState` (TypedDict) and the `ValidationResult` / `TestResult` / `ApplyResult` dataclasses shared across nodes. |
 | `llm.py` | Central LLM factory — rate-limited Gemini / OpenAI / local (Ollama-compatible) models, plus the pre-built ReAct agents used by each node. |
 | `tools.py` | File and shell tools available to the LLM agents (`read_file_numbered`, `read_file_exact`, `list_folder_content`, `write_file`, `run_shell_command`). |
-| `nodes/` | One module per graph node — `Initialize`, `Diagnose`, `Propose_changes`, `Plan_review`, `Propose_rewrite`, `Validate_diff`, `Apply_diff`, `test`, `HITL`, `Routing`, `Routing_changes`. |
+| `nodes/` | One module per graph node — `Initialize`, `Diagnose`, `Plan_review`, `Propose_rewrite`, `Validate_diff`, `Apply_diff`, `test`, `HITL`, `Routing`, `Routing_changes`. |
 | `Agent.py` | Earlier, simpler chat-agent prototype (single tool, no interrupt registry). Superseded by `Agent2.py`. |
 | `Fixing_issue.py` | Earlier standalone version of the workflow graph (no plan review, references a `nodes.commit` module not present in this repo). Superseded by `Assistant.py`. |
 
@@ -141,8 +141,18 @@ At the `human_approval` checkpoint the workflow currently prints the `SEARCH/REP
 
 Several areas where the workflow can be made smarter and more reliable:
 
+## Multi-File Edits & File Creation (Updated Quality)
+
+The workflow has been fundamentally upgraded to robustly support multi-file edits and creating new files from scratch:
+
+- **Iterative Patching:** The agent now processes each file sequentially via `propose_patch`. This isolates the LLM's context per file, significantly reducing hallucinations and syntax errors compared to generating a massive multi-file diff in a single prompt.
+- **File Creation capability:** If a task requires a new file, the planner sets `action: "create"`. The patcher then bypasses `SEARCH/REPLACE` logic and directly outputs the complete content of the new file.
+- **In-Memory Virtual Store:** File modifications are now strictly held in `virtual_files` (memory) and are passed along the graph state. The actual files on disk are completely untouched until the final `persist_approved` node, meaning discarded fixes leave zero mess on disk and no `git checkout` is required.
+- **Smarter Retry Routing:** When `validate_diff` fails, the graph routes back to `propose_patch` rather than `Diagnose`. This saves an expensive LLM reasoning step, as the diagnosis remains valid and only the patch formatting or application failed.
+- **Per-file HITL Review:** `human_approval` has been replaced with `diff_review_hitl`, which supports rejecting specific files from the patch while approving others, all seamlessly synced back to disk via `persist_approved`.
+
+## Future Improvements
+
 - **Parallel patch generation** — `propose_patch` currently processes planned files sequentially. Files that are independent of each other could be patched in parallel (e.g. via `asyncio.gather`) to cut wall-clock time on multi-file fixes.
-- **Smarter retry routing** — when `validate_diff` fails, the graph currently routes back to `Diagnose`. A lighter alternative would be to route back only to `propose_patch` with the validation error injected into the prompt, avoiding a full re-diagnosis for what is often just a whitespace or context-mismatch issue.
 - **Incremental test feedback** — `test_node` captures stdout/stderr from Docker but only surfaces a pass/fail signal to the retry loop. Passing the captured error output directly into the `Diagnose` prompt on the next retry would give the LLM much richer signal and reduce unnecessary iterations.
-- **Persistent virtual file store** — `apply_diff` writes to disk immediately. Keeping changes in an in-memory virtual store until `human_approval` is granted would make the "discard" path a no-op (no rollback needed) and prevent partial writes from leaving the repo in a broken state if the session is interrupted.
 - **Plan diffing on re-plan** — when the user rejects a plan and provides feedback, the new plan is shown in full. Highlighting what *changed* between the previous plan and the revised one (added/removed/modified steps) would help the user quickly verify their feedback was incorporated.
