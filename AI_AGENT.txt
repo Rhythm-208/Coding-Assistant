@@ -1,0 +1,16 @@
+]Learn pytest Lib
+
+
+One Architectural Warning
+Replacing code line-by-line using List[LineReplacement] works, but LLMs frequently struggle with it. If the AI replaces line 15, and then needs to insert a new line below it, it has to shift all subsequent line numbers in its head, which it is bad at.
+
+This is why earlier we used a replace_code_block tool (replacing everything between start_line and end_line with a chunk of new text). It is much more forgiving for LLMs to rewrite a 10-line function block entirely than to submit 4 separate single-line replacements. If you notice your agent messing up line numbers, you might want to switch back to the block-replacement method!
+
+
+difflib in propose rewrtie
+
+make "write a test" part of the agent's job, not an assumption
+
+
+Things to learn:
+1. Apply diff and parse_search_create_blocks function in validate_diff.py

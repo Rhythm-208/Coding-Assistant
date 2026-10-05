@@ -1,0 +1,48 @@
+{
+  "name": "ai-coding-assistant-chat",
+  "displayName": "AI Coding Assistant",
+  "description": "Chat sidebar that delegates coding tasks to the Agent2.py FastAPI backend",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiCodingAssistantSidebar",
+          "title": "AI Coding Assistant",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "aiCodingAssistantSidebar": [
+        {
+          "id": "aiCodingAssistant.chatView",
+          "name": "Chat",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "aiCodingAssistant.newSession",
+        "title": "AI Coding Assistant: New Session"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
