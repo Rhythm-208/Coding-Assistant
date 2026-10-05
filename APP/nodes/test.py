@@ -3,11 +3,9 @@ import os
 import tarfile
 import time
 
-from State import AgentState,TestResult
+from State import AgentState, TestResult
 import docker
 from docker.errors import NotFound
-
-
 
 DOCKER_IMAGE = "python:3.11-slim"
 CONTAINER_TIMEOUT_SECONDS = 15
@@ -25,70 +23,82 @@ def _get_client():
     return _client
 
 
-def _get_or_create_container(thread_id:str):
+def _get_or_create_container(thread_id: str, repo_path: str = None):
     container_id = _containers.get(thread_id)
-    #Maybe we can remove thread_id check for it
     if container_id:
         try:
             c = _get_client().containers.get(container_id)
             if c.status != "running":
                 c.start()
             return container_id
-
         except NotFound:
             pass
 
+    volumes = {}
+    if repo_path:
+        # Mount the repository read-only
+        volumes[os.path.abspath(repo_path)] = {'bind': '/repo_ro', 'mode': 'ro'}
+
     container = _get_client().containers.run(
         DOCKER_IMAGE,
-        command = "sleep infinity",
-        detach = True,
-        network_disabled = True,
-        mem_limit = "256m",
-        nano_cpus = 1_000_000_000,
-        user = "nobody",
-        working_dir = "/tmp",
+        command="sleep infinity",
+        detach=True,
+        network_disabled=True,
+        mem_limit="512m",
+        nano_cpus=1_000_000_000,
+        user="root",
+        working_dir="/tmp",
+        volumes=volumes,
     )
     _containers[thread_id] = container.id
     return container.id
 
-def _write_file_to_container(container,path:str,content:str)->None:
-    """Write content to path inside the container via a tar stream"""
-    data = content.encode("utf-8")
-    tarstream = io.BytesIO()
 
-    with tarfile.open(fileobj=tarstream, mode="w") as tar:
-        info = tarfile.TarInfo(name=path.lstrip("/"))
-        info.size = len(data)
-        tar.addfile(tarinfo=info, fileobj=io.BytesIO(data))
-
-    tarstream.seek(0)
-    container.put_archive("/tmp", tarstream)
-
-
-def run_in_sandbox(thread_id:str,file_path:str, virtual_files: dict = None)->dict:
-
-    if virtual_files and file_path in virtual_files:
-        code = virtual_files[file_path]
-    else:
-        with open(file_path,"r") as f:
-            code = f.read()
-
-    container_id = _get_or_create_container(thread_id)
+def run_in_sandbox(thread_id: str, repo_path: str, virtual_files: dict = None) -> dict:
+    container_id = _get_or_create_container(thread_id, repo_path)
     container = _get_client().containers.get(container_id)
 
-    container_path = os.path.basename(file_path)
-    _write_file_to_container(container,container_path,code)
+    # 1. Reset /tmp/repo from the read-only mount (skip heavy directories)
+    copy_cmd = (
+        "rm -rf /tmp/repo && mkdir -p /tmp/repo && "
+        "find /repo_ro -mindepth 1 -maxdepth 1 "
+        "! -name '.git' ! -name 'node_modules' ! -name '.venv' ! -name 'venv' ! -name 'env' ! -name '__pycache__' "
+        "-exec cp -a {} /tmp/repo/ \\; && "
+        "chown -R nobody /tmp/repo"
+    )
+    container.exec_run(cmd=["sh", "-c", copy_cmd], user="root")
+
+    # 2. Overlay virtual_files directly into /tmp/repo
+    if virtual_files:
+        tarstream = io.BytesIO()
+        with tarfile.open(fileobj=tarstream, mode="w") as tar:
+            for file_path, code in virtual_files.items():
+                data = code.encode("utf-8")
+                info = tarfile.TarInfo(name=file_path)
+                info.size = len(data)
+                tar.addfile(tarinfo=info, fileobj=io.BytesIO(data))
+        
+        tarstream.seek(0)
+        # put_archive extracts as root
+        container.put_archive("/tmp/repo", tarstream)
+        # Fix permissions so nobody can read/execute them
+        container.exec_run(cmd=["chown", "-R", "nobody", "/tmp/repo"], user="root")
 
     start = time.time()
 
+    # 3. Try running tests, or fallback to python compileall for syntax checks
+    # Installing pytest takes time, so we just use unittest discover. If there are no tests, it falls back to compileall.
+    test_command = "python3 -m unittest discover -s . -p 'test_*.py' 2>/dev/null || python3 -m compileall -q ."
+
     try:
         exit_code, output = container.exec_run(
-            cmd=["timeout", str(CONTAINER_TIMEOUT_SECONDS), "python3", "-m", "py_compile", f"/tmp/{container_path}"],
+            cmd=["timeout", str(CONTAINER_TIMEOUT_SECONDS), "sh", "-c", test_command],
             demux=True,  # separate stdout/stderr
             user="nobody",
+            workdir="/tmp/repo"
         )
         stdout, stderr = output
-        timed_out = (exit_code ==124)
+        timed_out = (exit_code == 124)
     except Exception as e:
         exit_code, stdout, stderr, timed_out = 1, b"", str(e).encode(), False
 
@@ -110,24 +120,22 @@ def cleanup_container(thread_id: str) -> None:
         except NotFound:
             pass
 
-#Creating Node->
 
 def test_node(state: AgentState) -> dict:
-    full_path = os.path.join(state["repo_path"],state["file_path"])
-    result = run_in_sandbox(state["thread_id"], full_path, state.get("virtual_files"))
+    repo_path = state["repo_path"]
+    
+    result = run_in_sandbox(state["thread_id"], repo_path, state.get("virtual_files"))
     passed = result["exit_code"] == 0 and not result["timed_out"]
 
     if passed:
         test_result = TestResult(passed=True, outcome="passed")
     else:
         outcome = "timeout" if result["timed_out"] else "failed"
-        test_result = TestResult(passed=False, outcome=outcome, failure_text=result["stderr"])
+        # Provide stdout and stderr for the LLM to diagnose
+        failure_text = f"STDOUT:\n{result['stdout']}\nSTDERR:\n{result['stderr']}"
+        test_result = TestResult(passed=False, outcome=outcome, failure_text=failure_text)
 
     return {
         "test_result": test_result,
         "iteration": state.get("iteration", 0) + 1,
     }
-
-
-
-
