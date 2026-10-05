@@ -2,7 +2,12 @@
 
 An AI coding assistant built on [LangGraph](https://github.com/langchain-ai/langgraph) that diagnoses issues in a codebase, plans a set of file changes, writes patches, validates and tests them in an isolated Docker sandbox, and asks for human approval before anything is written back to disk. It's exposed over a FastAPI chat endpoint intended for an editor integration (e.g. a VS Code extension).
 
-## How it works
+## Repository Structure
+
+- `APP/`: The core Python backend. Contains the FastAPI server, the conversational agent (`APP/Agent2.py`), the LangGraph state machines (`APP/Assistant.py` and `APP/nodes/`), and the sandbox environment handlers.
+- `FrontEnd/`: The VS Code extension (TypeScript/Node.js). Provides a graphical chat UI integrated right into the editor to communicate with the `APP/` backend, display proposed plans, show inline diffs, and handle human-in-the-loop (HITL) approvals seamlessly.
+
+## How it works (Backend)
 
 There are two layers:
 
@@ -104,11 +109,11 @@ You'll also need:
   LOCAL_LLM_ENDPOINT=http://localhost:11434/v1   # to use a local Ollama-compatible model instead
   ```
 
-## Running it
+## Running the Backend (APP)
 
 ```bash
-pip install -r requirements.txt   # once one exists — see above for the inferred list
-python Agent2.py                  # serves on http://0.0.0.0:8000
+pip install -r requirements.txt
+python APP/Agent2.py              # serves on http://0.0.0.0:8000
 ```
 
 Then send chat turns to it:
@@ -120,6 +125,13 @@ curl -X POST http://localhost:8000/sessions \
 ```
 
 The response will either be a normal chat reply, or — once the workflow kicks in — a plan for you to approve/reject/edit, followed later by a diff to approve before anything is written to your repo.
+
+## Running the Frontend (VS Code Extension)
+
+1. Open the `FrontEnd/Assistant2/vscode-agent-chat/` folder in VS Code.
+2. Run `npm install` to install extension dependencies.
+3. Press `F5` to open a new Extension Development Host window.
+4. Open the Coding Assistant panel to interact directly with the backend running on port `8000`.
 
 ## Notes
 
