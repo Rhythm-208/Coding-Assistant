@@ -99,16 +99,18 @@ def get_llm(model=None, **kwargs):
     raise ValueError(f"Unsupported LLM_MODEL '{model_name}'. Set LLM_MODEL to a Gemini, OpenAI, or configure LOCAL_LLM_ENDPOINT.")
 
 
-# Single shared LLM — all agents below use the same instance so we
-# don't create multiple ChatGoogleGenerativeAI objects unnecessarily.
-llm = get_llm()
+# Single shared LLM — default to Qwen for general non-tool tasks
+llm = get_llm(model="qwen2.5-coder:7b")
 
-# Shared Gemini 2.5 Flash instance – used by both propose_patch and the chat
-# layer.  Previously two identical instances were created; merging them lets
-# the rate-limiter account for both paths correctly.
-flash_llm = get_llm(model="gemini-2.5-flash")
-propose_rewrite_llm = flash_llm
+# Gemini for structured output and tool calling
+gemini_llm = get_llm(model="gemini-3.8-flash")
+
+# Shared Gemini 2.5 Flash instance for chat (which requires tool calling)
+flash_llm = gemini_llm
 chat_llm = flash_llm
+
+# Code writer instance - uses Gemini because it requires structured output
+propose_rewrite_llm = gemini_llm
 
 # ── Pre-built ReAct agents ───────────────────────────────────────────
 # NOTE: diagnose_agent, analyze_agent, and propose_code_changes_agent were

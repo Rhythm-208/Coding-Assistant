@@ -15,7 +15,7 @@ if not os.getenv("LANGCHAIN_API_KEY") and os.getenv("LANGSMITH_API_KEY"):
     os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGSMITH_API_KEY")
 os.environ.setdefault("LANGSMITH_TRACING", "true")
 
-from llm import llm
+from llm import chat_llm
 from Assistant import app as assistant_workflow
 from tools import write_file
 
@@ -49,7 +49,7 @@ def run_coding_workflow(message: str, repo_path: str) -> str:
 # 2. Set up the conversational agent
 memory = MemorySaver()
 chat_agent = create_agent(
-    llm,
+    chat_llm,
     tools=[run_coding_workflow, write_file],
     checkpointer=memory,
     system_prompt="""You are a helpful conversational AI coding assistant. You chat with the user to understand their coding problems. 

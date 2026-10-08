@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, START, END
 
 from State import AgentState
 from nodes.Initialize import initialize_workspace
+from nodes.Plan import analyze_repo
 from nodes.Diagnose import Diagnose
 from nodes.Propose_rewrite import propose_patch
 from nodes.Validate_diff import validate_diff, route_after_validation
@@ -22,6 +23,7 @@ graph = StateGraph(AgentState)
 
 # --- register every node ---
 graph.add_node("initialize_workspace", initialize_workspace)
+graph.add_node("analyze_repo", analyze_repo)
 graph.add_node("Diagnose", Diagnose)
 graph.add_node("propose_patch", propose_patch)
 graph.add_node("validate_diff", validate_diff)
@@ -33,7 +35,8 @@ graph.add_node("escalate", escalate)
 
 # --- straight-line edges (no branching) ---
 graph.add_edge(START, "initialize_workspace")
-graph.add_edge("initialize_workspace", "Diagnose")
+graph.add_edge("initialize_workspace", "analyze_repo")
+graph.add_edge("analyze_repo", "Diagnose")
 graph.add_edge("Diagnose", "propose_patch")
 graph.add_edge("propose_patch", "validate_diff")
 # validate_diff now has a conditional edge (Bug 5 fix)

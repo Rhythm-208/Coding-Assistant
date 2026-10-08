@@ -26,6 +26,10 @@ def validate_diff(state: AgentState) -> dict:
  
     touched_files = list({b.file_path for b in patch.blocks if b.file_path})
  
+    current_change = state.get("current_change")
+    target_file = current_change.get("file") if current_change else None
+    
+    import os
     for block in patch.blocks:
         if not block.file_path:
             err = "A block is missing a file_path."
@@ -34,6 +38,15 @@ def validate_diff(state: AgentState) -> dict:
                 "iteration": iteration + 1,
                 "Prev_Failed_Diagnose": [("assistant", f"Failed diff validation: {err}")],
             }
+            
+        if target_file:
+            norm_filepath = os.path.normpath(block.file_path)
+            norm_target = os.path.normpath(target_file)
+            if norm_filepath != norm_target and not norm_target.endswith(os.sep + norm_filepath):
+                if Path(target_file).name == Path(block.file_path).name or not os.path.isabs(block.file_path):
+                    block.file_path = target_file
+            else:
+                block.file_path = target_file
  
         if block.search == "":
             if block.file_path in virtual_files or Path(block.file_path).exists():
@@ -75,8 +88,9 @@ def validate_diff(state: AgentState) -> dict:
         if new_content is not None:
             virtual_files[block.file_path] = new_content
  
+    updated_touched_files = list({b.file_path for b in patch.blocks if b.file_path})
     return {
-        "validation_result": ValidationResult(valid=True, cleaned_diff="", touched_files=touched_files)
+        "validation_result": ValidationResult(valid=True, cleaned_diff="", touched_files=updated_touched_files)
     }
  
  

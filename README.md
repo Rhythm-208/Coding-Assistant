@@ -166,5 +166,11 @@ The workflow has been fundamentally upgraded to robustly support multi-file edit
 ## Future Improvements
 
 - **Parallel patch generation** — `propose_patch` currently processes planned files sequentially. Files that are independent of each other could be patched in parallel (e.g. via `asyncio.gather`) to cut wall-clock time on multi-file fixes.
-- **Incremental test feedback** — `test_node` captures stdout/stderr from Docker but only surfaces a pass/fail signal to the retry loop. Passing the captured error output directly into the `Diagnose` prompt on the next retry would give the LLM much richer signal and reduce unnecessary iterations.
 - **Plan diffing on re-plan** — when the user rejects a plan and provides feedback, the new plan is shown in full. Highlighting what *changed* between the previous plan and the revised one (added/removed/modified steps) would help the user quickly verify their feedback was incorporated.
+- **Hybrid Search and Replace** — Update the patch schema to include approximate `start_line` and `end_line` fields to augment the exact string matching, making edits even more robust to identical repeated code blocks (similar to Antigravity and Claude CLI).
+
+## Recent Upgrades
+
+- **Context Optimization (Diagnose):** The agent no longer receives a raw dump of the entire repository. It now uses pre-computed file summaries and project analysis to dramatically reduce context-window bloat and improve reasoning.
+- **Incremental Test Feedback:** The `test_node` now passes captured stdout/stderr from Docker failures directly back into the agent's state (`Prev_Failed_Diagnose`), giving the LLM the exact error signal needed to self-correct on the next iteration.
+- **Resilient Patching:** `Propose_rewrite` is now aware of previous failed attempts to avoid repeating mistakes, and `Validate_diff` automatically forgives and corrects minor file-path hallucinations.

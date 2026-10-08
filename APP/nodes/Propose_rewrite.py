@@ -61,6 +61,14 @@ def propose_patch(state: AgentState) -> dict:
         instruction = current_change.get("instruction", "")
         action = current_change.get("action", "edit")
 
+        prev_failures = state.get("Prev_Failed_Diagnose", [])
+        failure_context = ""
+        if prev_failures:
+            failure_context = "\n\nPREVIOUS FAILED ATTEMPTS (do NOT repeat these mistakes):\n"
+            for msg in prev_failures:
+                content = msg.content if hasattr(msg, "content") else str(msg)
+                failure_context += f"- {content}\n"
+
         if action == "create":
             user_prompt = f"""MESSAGE: {state.get('message', state.get('prompt', ''))}
 DIAGNOSIS: {state.get('Diagnose')}
@@ -68,6 +76,7 @@ REPO_PATH: {state.get('repo_path')}
 
 CURRENT TASK: Create a new file: {file_to_edit}
 INSTRUCTION: {instruction}
+{failure_context}
 
 Produce one block for this file, with an empty search field and the
 complete file content in replace."""
@@ -79,6 +88,7 @@ REPO_PATH: {state.get('repo_path')}
 
 CURRENT TASK: Modify the file: {file_to_edit}
 INSTRUCTION: {instruction}
+{failure_context}
 
 CURRENT FILE CONTENTS of {file_to_edit}:
 {file_content}"""
@@ -95,6 +105,9 @@ CURRENT FILE CONTENTS of {file_to_edit}:
     user_prompt = f"""MESSAGE: {state.get('message', state.get('prompt', ''))}
 DIAGNOSIS: {state.get('Diagnose')}
 REPO_PATH: {state.get('repo_path')}
+
+PREVIOUS FAILED ATTEMPTS:
+{[msg.content if hasattr(msg, 'content') else str(msg) for msg in state.get('Prev_Failed_Diagnose', [])]}
 
 Below are the repository files. Based on the diagnosis, propose the
 needed changes.

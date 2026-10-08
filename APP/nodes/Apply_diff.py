@@ -34,13 +34,20 @@ def apply_diff(state: AgentState, auto_apply: bool = False) -> dict:
         vf = state.get("virtual_files")
         virtual_files = vf.copy() if vf else {}
 
+        import os
         for block in patch.blocks:
             filepath = block.file_path
 
-            if target_file and filepath != target_file:
-                raise ValueError(f"Attempted to modify {filepath}, but current target is {target_file}")
-
-            if block.search == "":
+            if target_file:
+                norm_filepath = os.path.normpath(filepath)
+                norm_target = os.path.normpath(target_file)
+                if norm_filepath != norm_target and not norm_target.endswith(os.sep + norm_filepath):
+                    if Path(target_file).name == Path(filepath).name or not os.path.isabs(filepath):
+                        filepath = target_file
+                    else:
+                        raise ValueError(f"Attempted to modify {filepath}, but current target is {target_file}")
+                else:
+                    filepath = target_file
                 # new file creation - set entire content directly
                 virtual_files[filepath] = block.replace
                 continue

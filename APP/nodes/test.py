@@ -129,13 +129,18 @@ def test_node(state: AgentState) -> dict:
 
     if passed:
         test_result = TestResult(passed=True, outcome="passed")
+        return {
+            "test_result": test_result,
+            "iteration": state.get("iteration", 0) + 1,
+        }
     else:
         outcome = "timeout" if result["timed_out"] else "failed"
         # Provide stdout and stderr for the LLM to diagnose
         failure_text = f"STDOUT:\n{result['stdout']}\nSTDERR:\n{result['stderr']}"
         test_result = TestResult(passed=False, outcome=outcome, failure_text=failure_text)
 
-    return {
-        "test_result": test_result,
-        "iteration": state.get("iteration", 0) + 1,
-    }
+        return {
+            "test_result": test_result,
+            "iteration": state.get("iteration", 0) + 1,
+            "Prev_Failed_Diagnose": [("assistant", f"Test execution failed.\n{failure_text}")]
+        }

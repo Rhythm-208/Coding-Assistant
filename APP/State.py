@@ -63,6 +63,8 @@ class AgentState(TypedDict):
     # --- Changes workflow fields ---
     prompt: Optional[str]           # user's natural-language change request
     Analysis: Optional[str]         # analyze node's understanding of what to change
+    file_summaries: Optional[dict]
+    project_analysis: Optional[str]
 
     # --- Assistant Workflow specific tracking fields ---
     changes_to_make: list[dict]
