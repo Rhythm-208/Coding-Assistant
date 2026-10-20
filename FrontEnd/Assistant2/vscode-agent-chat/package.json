@@ -3,6 +3,11 @@
   "displayName": "AI Coding Assistant",
   "description": "Chat sidebar that delegates coding tasks to the Agent2.py FastAPI backend",
   "version": "0.1.0",
+  "publisher": "rhythm-208",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rhythm-208/Coding-Assistant.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

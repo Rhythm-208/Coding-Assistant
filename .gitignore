@@ -28,3 +28,6 @@ __pycache__/
 
 # Project specific
 toy_repo.url
+
+# Packaged VS Code extension
+*.vsix

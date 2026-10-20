@@ -91,7 +91,7 @@ def run_in_sandbox(thread_id: str, repo_path: str, virtual_files: dict = None) -
     # whole command, so the two steps are chained with && rather than falling back with ||.
     # stderr is kept because unittest reports failures there and Diagnose needs to see them.
     test_command = (
-        "python3 -m compileall -q . && "
+        "python3 -m compileall -q -f . && "  # -f: ignore stale .pyc copied from the repo
         "if find . -name 'test_*.py' | grep -q .; then "
         "python3 -m unittest discover -s . -p 'test_*.py'; fi"
     )

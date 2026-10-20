@@ -100,6 +100,14 @@ You'll also need:
 
 ## Running the Backend (APP)
 
+On Windows, the easiest way is the start script. It creates/repairs `.venv`, installs dependencies when `requirements.txt` changes, warns if Docker isn't running, and serves on `http://127.0.0.1:8000`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_backend.ps1
+```
+
+Or manually:
+
 ```bash
 pip install -r requirements.txt
 python APP/Agent2.py              # serves on http://0.0.0.0:8000
