@@ -1,5 +1,4 @@
 from State import AgentState
-import subprocess
 from nodes.test import cleanup_container
 
 def route_after_test(state: AgentState) -> str:
@@ -16,13 +15,8 @@ def route_after_test(state: AgentState) -> str:
 
 
 def escalate(state: AgentState) -> dict:
-    # revert whatever the last apply_diff left in the working tree - we
-    # never want to hand back a repo with an unproven, uncommitted patch
-    # sitting in it
-    repo_path = state.get("repo_path")
-    if repo_path:
-        subprocess.run(["git", "checkout", "--", "."], cwd=repo_path, capture_output=True)
-
+    # Nothing to revert on disk: patches only live in virtual_files until
+    # persist_approved writes them, so the user's working tree is untouched.
     thread_id = state.get("thread_id")
     if thread_id:
         cleanup_container(thread_id)

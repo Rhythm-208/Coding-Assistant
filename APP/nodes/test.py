@@ -86,9 +86,15 @@ def run_in_sandbox(thread_id: str, repo_path: str, virtual_files: dict = None) -
 
     start = time.time()
 
-    # 3. Try running tests, or fallback to python compileall for syntax checks
-    # Installing pytest takes time, so we just use unittest discover. If there are no tests, it falls back to compileall.
-    test_command = "python3 -m unittest discover -s . -p 'test_*.py' 2>/dev/null || python3 -m compileall -q ."
+    # 3. Always syntax-check with compileall, then run unittest discover if any test files exist.
+    # Installing pytest takes time, so we just use unittest discover. A failing test must fail the
+    # whole command, so the two steps are chained with && rather than falling back with ||.
+    # stderr is kept because unittest reports failures there and Diagnose needs to see them.
+    test_command = (
+        "python3 -m compileall -q . && "
+        "if find . -name 'test_*.py' | grep -q .; then "
+        "python3 -m unittest discover -s . -p 'test_*.py'; fi"
+    )
 
     try:
         exit_code, output = container.exec_run(

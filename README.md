@@ -82,22 +82,11 @@ initialize_workspace
 
 ## Requirements
 
-No `requirements.txt` is currently checked in. Based on the imports used, you'll need:
+Python dependencies are listed in `requirements.txt` (install with `pip install -r requirements.txt`). Notable ones:
 
-```
-fastapi
-uvicorn
-pydantic
-python-dotenv
-langchain
-langchain-core
-langgraph
-langgraph-checkpoint
-langsmith
-docker              # Python Docker SDK — a running Docker daemon is required for test_node
-langchain-google-genai   # if using Gemini models
-langchain-openai         # if using OpenAI or an OpenAI-compatible local endpoint
-```
+- `docker` — Python Docker SDK; a running Docker daemon is required for `test_node`
+- `langchain-google-genai` — if using Gemini models
+- `langchain-openai` — if using OpenAI or an OpenAI-compatible local endpoint
 
 You'll also need:
 - **Docker** running locally, since `test_node` spins up a `python:3.11-slim` container to execute the target file.
